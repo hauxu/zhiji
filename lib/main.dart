@@ -193,11 +193,21 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    if (Platform.isWindows) {
+      WindowsShell.instance.glassEnabled.addListener(_onGlassChanged);
+    }
+  }
+
+  void _onGlassChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    if (Platform.isWindows) {
+      WindowsShell.instance.glassEnabled.removeListener(_onGlassChanged);
+    }
     super.dispose();
   }
 
@@ -252,7 +262,9 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
     final bgOn =
         ui.bgEnabled && ui.bgPath.isNotEmpty && File(ui.bgPath).existsSync();
     // Windows：窗口是毛玻璃，页面要半透明才能透出材质。
-    final glassOn = !bgOn && Platform.isWindows;
+    final glassOn = !bgOn &&
+        Platform.isWindows &&
+        WindowsShell.instance.glassEnabled.value;
     final displayTheme = (bgOn || glassOn)
         ? effectiveTheme.copyWith(
             scaffoldBackgroundColor: Colors.transparent,
@@ -278,7 +290,8 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         WindowBridge.setTheme(
           dark: effectiveDark,
-          caption: _argb(effectiveTheme.colorScheme.surface),
+          // 开毛玻璃时不写标题栏底色，交给 DWM 与背景混合。
+          caption: glassOn ? -1 : _argb(effectiveTheme.colorScheme.surface),
           captionText: _argb(effectiveTheme.colorScheme.onSurface),
         );
       });
@@ -304,8 +317,8 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
           wrapped = Stack(
             fit: StackFit.expand,
             children: [
-              // 只铺很淡的一层压光；正文可读性靠卡片自己的底色。
-              ColoredBox(color: base.withValues(alpha: 0.12)),
+              // 页面底完全交给窗口材质，正文可读性靠卡片自己的底色。
+              ColoredBox(color: base.withValues(alpha: 0.0)),
               wrapped,
             ],
           );

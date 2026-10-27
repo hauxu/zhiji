@@ -155,8 +155,11 @@ void FlutterWindow::HandleWindowMethod(
       // 旧系统不支持时静默忽略。
       DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &use_dark,
                             sizeof(use_dark));
-      COLORREF cap = ArgbToColorRef(caption);
-      DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &cap, sizeof(cap));
+      // caption < 0 表示交给 DWM 自己决定（开毛玻璃时用，避免画出实底白条）。
+      if (caption >= 0) {
+        COLORREF cap = ArgbToColorRef(caption);
+        DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &cap, sizeof(cap));
+      }
       COLORREF cap_text = ArgbToColorRef(caption_text);
       DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, &cap_text,
                             sizeof(cap_text));
@@ -321,19 +324,6 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
-    case WM_SYSCOMMAND:
-      // 最小化按钮：开了「最小化到托盘」就隐藏窗口，只留托盘图标。
-      if ((wparam & 0xFFF0) == SC_MINIMIZE && minimize_to_tray_) {
-        if (window_channel_) {
-          window_channel_->InvokeMethod(
-              "onMinimizeRequested",
-              std::make_unique<flutter::EncodableValue>(true));
-        }
-        ::ShowWindow(hwnd, SW_HIDE);
-        return 0;
-      }
-      break;
-
     case WM_CLOSE:
       // 开了「最小化到托盘」就隐藏窗口，交给托盘继续后台同步。
       if (minimize_to_tray_ && !quit_requested_) {

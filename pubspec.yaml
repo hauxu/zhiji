@@ -2,7 +2,7 @@ name: goalday
 description: "之计 (judging)：两个人一起用的手帐风计划应用，含清单、计划、习惯、日记与情侣同步。"
 homepage: https://www.huaxu.xin/zhiji/
 publish_to: 'none'
-version: 5.16.19+127
+version: 5.16.20+128
 
 environment:
   sdk: ^3.13.2
@@ -54,5 +54,6 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
+    - assets/icon/
     - assets/sounds/
     - assets/CHANGELOG.md

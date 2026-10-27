@@ -28,6 +28,9 @@ class WindowsShell with TrayListener {
   Future<void> Function()? onSyncNow;
   VoidCallback? onQuit;
 
+  /// 毛玻璃开关状态；主题层监听它决定是否走透明底。
+  final ValueNotifier<bool> glassEnabled = ValueNotifier<bool>(true);
+
   bool _ready = false;
   bool _quitting = false;
 
@@ -47,10 +50,7 @@ class WindowsShell with TrayListener {
     await applyGlassFromPrefs();
     trayManager.addListener(this);
     try {
-      await trayManager.setIcon(
-        'windows/runner/resources/app_icon.ico',
-        isTemplate: false,
-      );
+      await trayManager.setIcon('assets/icon/tray.ico', isTemplate: false);
     } catch (_) {
       // 便携版可能取不到相对路径图标：用 exe 自带图标兜底。
     }
@@ -65,6 +65,7 @@ class WindowsShell with TrayListener {
     final prefs = await SharedPreferences.getInstance();
     final on = enabled ?? (prefs.getBool(_prefGlass) ?? true);
     await prefs.setBool(_prefGlass, on);
+    glassEnabled.value = on;
     try {
       await acrylic.Window.initialize();
     } catch (_) {}
@@ -73,7 +74,7 @@ class WindowsShell with TrayListener {
       await acrylic.Window.setEffect(
         effect:
             on ? acrylic.WindowEffect.acrylic : acrylic.WindowEffect.disabled,
-        color: const Color(0x1AF4F1EA),
+        color: const Color(0x00000000),
       );
       return;
     } catch (_) {}
