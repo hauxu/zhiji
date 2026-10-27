@@ -317,8 +317,8 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
           wrapped = Stack(
             fit: StackFit.expand,
             children: [
-              // 页面底完全交给窗口材质，正文可读性靠卡片自己的底色。
-              ColoredBox(color: base.withValues(alpha: 0.0)),
+              // 页面底色压一层很薄的雾面：能看见后面的轮廓，又不影响读字。
+              ColoredBox(color: base.withValues(alpha: 0.35)),
               wrapped,
             ],
           );
