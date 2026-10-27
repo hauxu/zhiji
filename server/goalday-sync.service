@@ -1,0 +1,42 @@
+[Unit]
+Description=GoalDay couple sync relay
+After=network.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+# 进程无响应时由 systemd 重启
+WatchdogSec=120
+LimitNOFILE=16384
+
+ExecStart=/usr/bin/python3 /opt/goalday-sync/server.py
+EnvironmentFile=/etc/goalday-sync/env
+
+# 专用低权限账号，创建方式见 README。它只需要数据目录和证书目录的权限。
+User=goalday
+Group=goalday
+
+Restart=always
+RestartSec=3
+# 数据目录被另一个实例占用时退出码为 1，不要让 systemd 反复重拉
+RestartPreventExitStatus=1
+
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+ReadWritePaths=/var/lib/goalday-sync
+
+[Install]
+WantedBy=multi-user.target

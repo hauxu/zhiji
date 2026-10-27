@@ -1,0 +1,86 @@
+# 全自动异地备份：把服务器上尚未拉取过的每日备份全部补偿拉取到本机，
+# 逐个校验归档结构；失败保留原状等下次重试，成功后保留最近 N 份并写日志。
+# 由 Windows 计划任务每日调用，也可手动执行。
+#
+# 用法：复制为 pull_offsite_backup.ps1（已在 .gitignore 中），
+# 填入自己的 SSH 主机与私钥路径后用计划任务调用。
+param(
+  [string]$Dest = "$env:USERPROFILE\goalday-backups",
+  [int]$Keep = 14,
+  [string]$SshHost = 'your-server-alias',
+  [string]$KeyPath = "$env:USERPROFILE\.ssh\id_ed25519"
+)
+
+$ErrorActionPreference = 'Continue'
+New-Item -ItemType Directory -Force -Path $Dest | Out-Null
+$log = Join-Path $Dest 'pull.log'
+function Write-Log([string]$msg) {
+  "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $msg" | Add-Content -Path $log -Encoding utf8
+}
+function Prune-Old {
+  Get-ChildItem (Join-Path $Dest 'goalday-*.tar.gz') -ErrorAction SilentlyContinue |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -Skip $Keep |
+    ForEach-Object { Remove-Item $_.FullName -Force; Write-Log "prune $($_.Name)" }
+}
+
+Write-Log '--- pull start ---'
+$sshArgs = @('-i', $KeyPath, '-o', 'IdentitiesOnly=yes', '-o', 'BatchMode=yes',
+             '-o', 'ConnectTimeout=20', $SshHost)
+
+$remote = & ssh @sshArgs 'sudo ls -1 /var/backups/goalday/goalday-*.tar.gz 2>/dev/null' 2>$null
+$remoteCode = $LASTEXITCODE
+if ($remoteCode -ne 0 -or -not $remote) {
+  Write-Log "ERROR: 无法获取服务器备份列表 code=$remoteCode"
+  Prune-Old
+  exit 1
+}
+$names = @($remote |
+  ForEach-Object { ($_ -split '[\\/]')[-1].Trim() } |
+  Where-Object { $_ -match '^goalday-\d{8}-\d{6}\.tar\.gz$' } |
+  Sort-Object -Unique)
+
+$new = 0
+$failed = $false
+foreach ($n in $names) {
+  $target = Join-Path $Dest $n
+  if (Test-Path $target) { continue }
+
+  $part = "$target.part"
+  $remotePath = "/var/backups/goalday/$n"
+  & ssh @sshArgs "sudo install -m 644 '$remotePath' /tmp/gd-pull.tgz" 2>$null
+  if ($LASTEXITCODE -ne 0) {
+    Write-Log "ERROR: 服务器侧准备失败 $n"
+    $failed = $true
+    break
+  }
+  & scp -i $KeyPath -o IdentitiesOnly=yes -o BatchMode=yes "${SshHost}:/tmp/gd-pull.tgz" $part 2>$null
+  $scpCode = $LASTEXITCODE
+  & ssh @sshArgs 'sudo rm -f /tmp/gd-pull.tgz' 2>$null
+  if ($scpCode -ne 0 -or -not (Test-Path $part)) {
+    Write-Log "ERROR: 下载失败 $n code=$scpCode"
+    if (Test-Path $part) { Remove-Item $part -Force }
+    $failed = $true
+    break
+  }
+
+  # 坏包不入库：tar 必须可读且包含 accounts.json。
+  $entries = & tar -tzf $part 2>$null
+  $ok = ($LASTEXITCODE -eq 0) -and
+        (($entries | Select-String -SimpleMatch 'accounts.json' | Measure-Object).Count -gt 0)
+  if (-not $ok) {
+    Write-Log "ERROR: 备份包校验失败 $n"
+    Remove-Item $part -Force
+    $failed = $true
+    break
+  }
+
+  Move-Item $part $target -Force
+  $new++
+  Write-Log "ok: $n ($((Get-Item $target).Length) bytes)"
+}
+
+Prune-Old
+if ($failed) { exit 1 }
+Write-Log "--- pull done (new=$new) ---"
+exit 0

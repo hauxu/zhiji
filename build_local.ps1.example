@@ -1,0 +1,24 @@
+# 本地构建脚本模板。复制为 build_local.ps1（已被 .gitignore 忽略）后填入自己的参数。
+# 用法： .\build_local.ps1 apk | win
+param([Parameter(Mandatory=$true)][string]$Target)
+
+# 本机工具链路径，按需修改。
+$env:JAVA_HOME = "C:/path/to/jdk-17"
+$env:ANDROID_HOME = "C:/path/to/android-sdk"
+$env:PUB_CACHE = ""
+$env:PATH = "C:/path/to/flutter/bin;$env:PATH"
+
+# 同步服务参数需与自建服务端的 GD_* 环境变量一致，详见 README「自建同步服务器」。
+# AI 识别不走构建期变量：在 App 内「我的 → AI 助手」填接口与 Key 即可。
+$defines = @(
+  "--dart-define=ZHIZI_SYNC_HOST=your.server.com",
+  "--dart-define=ZHIZI_SYNC_PORT=8443",
+  "--dart-define=ZHIZI_SYNC_APPKEY=<服务端 GD_APP_KEY>",
+  "--dart-define=ZHIZI_SYNC_CERT=<服务器证书 SHA-256 指纹，去冒号小写>"
+)
+
+switch ($Target) {
+  "apk" { flutter build apk --release @defines }
+  "win" { flutter build windows --release @defines }
+  default { Write-Error "Usage: .\build_local.ps1 apk|win" }
+}

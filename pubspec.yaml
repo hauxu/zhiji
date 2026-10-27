@@ -1,0 +1,57 @@
+name: goalday
+description: "之计 (judging)：两个人一起用的手帐风计划应用，含清单、计划、习惯、日记与情侣同步。"
+homepage: https://www.huaxu.xin/zhiji/
+publish_to: 'none'
+version: 5.16.18+126
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  tray_manager: ^0.2.4
+  launch_at_startup: ^0.5.1
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  provider: ^6.1.5
+  share_plus: ^10.1.4
+  shared_preferences: ^2.5.3
+  intl: ^0.20.2
+  crypto: ^3.0.6
+  flutter_local_notifications: ^19.5.0
+  timezone: ^0.10.0
+  open_filex: ^4.5.0
+  device_info_plus: ^12.4.0
+  package_info_plus: ^8.3.0
+  cryptography: ^2.7.0
+  image_picker: ^1.1.2
+  file_selector: ^1.1.0
+  path_provider: ^2.1.4
+  flutter_slidable: ^3.1.1
+  dynamic_color: ^1.7.0
+  audioplayers: ^6.8.1
+  lunar: ^1.7.8
+  connectivity_plus: ^7.3.1
+  geolocator: ^14.0.2
+  android_alarm_manager_plus: ^5.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  image_path: "assets/icon/app_icon.png"
+  adaptive_icon_background: "#002FA7"
+  adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  android: true
+  ios: false
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/sounds/
+    - assets/CHANGELOG.md

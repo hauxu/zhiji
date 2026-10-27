@@ -1,0 +1,96 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.pyo
+__pycache__/
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Widget Preview related
+.widget_preview/
+
+# 本地构建产物与发布包
+/dist/
+/build_local.ps1
+.mimosa/
+windows/vc_redist.x64.exe
+
+# Kotlin 编译器错误日志
+android/.kotlin/
+
+# 本地部署脚本（含服务器信息，不入库）
+.deploy/
+.deploy_*.sh
+
+# 本地联调服务器数据
+.localtest/
+tool_emu_*.png
+*.log
+
+# 构建产物（内嵌编译期 dart-define，不入库）
+/judging-*
+*.apk
+*.exe
+
+# 交接说明（含服务器与密钥路径，不入库）
+/HANDOFF.md
+
+# 审计/调试留下的临时目录与备份副本
+/.text-audit-backup/
+/.runtime/
+/.audit/
+*.bak*
+# Windows 保留名文件（误建会让 git add 直接报错）
+/nul
+# 本机测试脚本把 pyc 写进了字面量目录 %TEMP%
+/%TEMP%/
+
+# 运维脚本（含服务器地址、SSH 主机别名与私钥路径，不入库；模板见 tools/*.example）
+/tools/pull_offsite_backup.ps1
+
+# 开发期留在根目录的截图与导出文件（不属于源码）
+/*.png
+/ota*.json
+/version_*.json
+/zhiji*.html
+/prefs_inject.xml
