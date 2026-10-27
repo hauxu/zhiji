@@ -100,7 +100,7 @@ class SyncService extends ChangeNotifier {
   static const _maxBackoffForeground = Duration(seconds: 15);
   /// 客户端版本：随 sync 请求上报；服务端在账号有加密备份时据此拒绝旧版 push。
   /// 发版时须与 pubspec.yaml 的 version 保持一致（只取 x.y.z）。
-  static const clientVersion = '5.16.18';
+  static const clientVersion = '5.16.19';
   int _failStreak = 0; // 连续网络类失败次数，驱动指数退避
   bool _offline = false;
   bool _boardVisible = false;

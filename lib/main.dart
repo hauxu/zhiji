@@ -264,7 +264,7 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
             ),
             cardTheme: effectiveTheme.cardTheme.copyWith(
               color: effectiveTheme.colorScheme.surfaceContainerLow.withValues(
-                alpha: 0.8,
+                alpha: 0.92,
               ),
             ),
           )
@@ -281,22 +281,13 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
           caption: _argb(effectiveTheme.colorScheme.surface),
           captionText: _argb(effectiveTheme.colorScheme.onSurface),
         );
-        if (Platform.isWindows) {
-          // 浅色主题给浅色蒙层，深色给深色，Mica 才能跟内容对得上。
-          final base = effectiveTheme.colorScheme.surface;
-          final tint = _argb(base.withValues(alpha: 0.62));
-          WindowBridge.setBackdrop(
-            mode: effectiveDark ? 'mica' : 'mica',
-            tint: tint,
-          );
-        }
       });
     }
     return MaterialApp(
       title: '之计',
       debugShowCheckedModeBanner: false,
-      theme: bgOn ? displayTheme : light,
-      darkTheme: bgOn ? displayTheme : dark,
+      theme: (bgOn || glassOn) ? displayTheme : light,
+      darkTheme: (bgOn || glassOn) ? displayTheme : dark,
       themeMode: themeStore.darkMode ? ThemeMode.dark : ThemeMode.system,
       themeAnimationDuration: const Duration(milliseconds: 450),
       themeAnimationCurve: Curves.easeOutCubic,
@@ -313,8 +304,8 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
           wrapped = Stack(
             fit: StackFit.expand,
             children: [
-              // 半透明底色：留出能看见背后轮廓的透明度，卡片另外再压一层。
-              ColoredBox(color: base.withValues(alpha: 0.62)),
+              // 只铺很淡的一层压光；正文可读性靠卡片自己的底色。
+              ColoredBox(color: base.withValues(alpha: 0.12)),
               wrapped,
             ],
           );

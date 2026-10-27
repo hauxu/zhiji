@@ -321,6 +321,19 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;
+    case WM_SYSCOMMAND:
+      // 最小化按钮：开了「最小化到托盘」就隐藏窗口，只留托盘图标。
+      if ((wparam & 0xFFF0) == SC_MINIMIZE && minimize_to_tray_) {
+        if (window_channel_) {
+          window_channel_->InvokeMethod(
+              "onMinimizeRequested",
+              std::make_unique<flutter::EncodableValue>(true));
+        }
+        ::ShowWindow(hwnd, SW_HIDE);
+        return 0;
+      }
+      break;
+
     case WM_CLOSE:
       // 开了「最小化到托盘」就隐藏窗口，交给托盘继续后台同步。
       if (minimize_to_tray_ && !quit_requested_) {

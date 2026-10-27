@@ -74,11 +74,14 @@ class WindowBridge {
     } catch (_) {}
   }
 
-  /// 主窗口收到关闭请求（已隐藏到托盘）时回调。
+  /// 主窗口收到关闭/最小化请求（已隐藏到托盘）时回调。
   static void onCloseRequested(Future<void> Function() handler) {
     if (!Platform.isWindows) return;
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'onCloseRequested') await handler();
+      if (call.method == 'onCloseRequested' ||
+          call.method == 'onMinimizeRequested') {
+        await handler();
+      }
     });
   }
 

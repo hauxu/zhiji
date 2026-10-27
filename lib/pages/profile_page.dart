@@ -1107,19 +1107,8 @@ class _SettingsCard extends StatelessWidget {
             const Divider(height: 1, indent: 16, endIndent: 16),
             const _CardTitle('Windows'),
             const _LaunchAtStartupTile(),
-            ListTile(
-              dense: true,
-              leading: Icon(
-                Icons.minimize_rounded,
-                size: 20,
-                color: scheme.onSurfaceVariant,
-              ),
-              title: const Text('关闭窗口时最小化到托盘', style: TextStyle(fontSize: 14)),
-              subtitle: const Text(
-                '关闭后留在托盘继续同步',
-                style: TextStyle(fontSize: 11),
-              ),
-            ),
+            const _GlassTile(),
+            const _MinimizeToTrayTile(),
           ],
           const Divider(height: 1, indent: 16, endIndent: 16),
           const _CardTitle('通用'),
@@ -1265,6 +1254,104 @@ class _LaunchAtStartupTileState extends State<_LaunchAtStartupTile> {
       subtitle: const Text('登录后自动启动，不弹主窗口', style: TextStyle(fontSize: 11)),
       value: _loaded ? _enabled : false,
       onChanged: _loaded ? _toggle : null,
+    );
+  }
+}
+
+/// 「窗口毛玻璃」开关：Mica/亚克力，关掉就回到不透明窗口。
+class _GlassTile extends StatefulWidget {
+  const _GlassTile();
+
+  @override
+  State<_GlassTile> createState() => _GlassTileState();
+}
+
+class _GlassTileState extends State<_GlassTile> {
+  bool _enabled = true;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WindowsShell.instance.isGlassEnabled().then((v) {
+      if (mounted) {
+        setState(() {
+          _enabled = v;
+          _loaded = true;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SwitchListTile(
+      dense: true,
+      secondary: Icon(
+        Icons.blur_on_rounded,
+        size: 20,
+        color: scheme.onSurfaceVariant,
+      ),
+      title: const Text('窗口毛玻璃', style: TextStyle(fontSize: 14)),
+      subtitle: const Text('透出桌面轮廓', style: TextStyle(fontSize: 11)),
+      value: _enabled,
+      onChanged: _loaded
+          ? (v) async {
+              m3HapticSelect();
+              setState(() => _enabled = v);
+              await WindowsShell.instance.setGlassEnabled(v);
+            }
+          : null,
+    );
+  }
+}
+
+/// 「关闭窗口时最小化到托盘」开关。
+class _MinimizeToTrayTile extends StatefulWidget {
+  const _MinimizeToTrayTile();
+
+  @override
+  State<_MinimizeToTrayTile> createState() => _MinimizeToTrayTileState();
+}
+
+class _MinimizeToTrayTileState extends State<_MinimizeToTrayTile> {
+  bool _enabled = true;
+  bool _loaded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WindowsShell.instance.isMinimizeToTray().then((v) {
+      if (mounted) {
+        setState(() {
+          _enabled = v;
+          _loaded = true;
+        });
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return SwitchListTile(
+      dense: true,
+      secondary: Icon(
+        Icons.minimize_rounded,
+        size: 20,
+        color: scheme.onSurfaceVariant,
+      ),
+      title: const Text('关闭窗口时最小化到托盘', style: TextStyle(fontSize: 14)),
+      subtitle: const Text('关闭后继续后台同步', style: TextStyle(fontSize: 11)),
+      value: _enabled,
+      onChanged: _loaded
+          ? (v) async {
+              m3HapticSelect();
+              setState(() => _enabled = v);
+              await WindowsShell.instance.setMinimizeToTray(v);
+            }
+          : null,
     );
   }
 }
@@ -1961,10 +2048,12 @@ void showThemeColorPicker(BuildContext context) {
                 ),
               ),
               const SizedBox(height: 10),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                dense: true,
-                title: const Text('跟随系统取色', style: TextStyle(fontSize: 14)),
+              if (!Platform.isWindows)
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                  title: const Text('跟随系统取色',
+                      style: TextStyle(fontSize: 14)),
                 subtitle: Text(
                   themeStore.useDynamic ? '使用系统壁纸色' : '使用传统色',
                   style: TextStyle(

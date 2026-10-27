@@ -1,12 +1,14 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_acrylic/flutter_acrylic.dart' as acrylic;
 import 'package:launch_at_startup/launch_at_startup.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tray_manager/tray_manager.dart';
+
+import '../util/window_bridge.dart';
 
 /// 桌面（Windows）外壳：托盘图标、关闭最小化到托盘、开机自启。
 ///
@@ -17,6 +19,7 @@ class WindowsShell with TrayListener {
   static final WindowsShell instance = WindowsShell._();
 
   static const _prefMinimizeToTray = 'gd2_minimize_to_tray';
+  static const _prefGlass = 'gd2_window_glass';
   static const _prefTrayHintShown = 'gd2_tray_hint_shown';
   static const _prefAutoStart = 'gd2_launch_at_startup';
 
@@ -41,6 +44,7 @@ class WindowsShell with TrayListener {
     onQuit = quit;
     _ready = true;
 
+    await applyGlassFromPrefs();
     trayManager.addListener(this);
     try {
       await trayManager.setIcon(
@@ -52,6 +56,67 @@ class WindowsShell with TrayListener {
     }
     await trayManager.setToolTip('之计');
     await _refreshMenu();
+  }
+
+  /// 读取设置并应用窗口材质：Win11 用 Mica，旧系统退亚克力。
+  /// 关掉开关就回到不透明窗口。
+  Future<void> applyGlassFromPrefs({bool? enabled}) async {
+    if (!_enabled) return;
+    final prefs = await SharedPreferences.getInstance();
+    final on = enabled ?? (prefs.getBool(_prefGlass) ?? true);
+    await prefs.setBool(_prefGlass, on);
+    try {
+      await acrylic.Window.initialize();
+    } catch (_) {}
+    // 先试亚克力（模糊 + 半透明，Win10/11 都支持），失败再退纯透明。
+    try {
+      await acrylic.Window.setEffect(
+        effect:
+            on ? acrylic.WindowEffect.acrylic : acrylic.WindowEffect.disabled,
+        color: const Color(0x1AF4F1EA),
+      );
+      return;
+    } catch (_) {}
+    try {
+      await acrylic.Window.setEffect(
+        effect:
+            on ? acrylic.WindowEffect.transparent : acrylic.WindowEffect.disabled,
+      );
+    } catch (_) {}
+  }
+
+  Future<bool> isGlassEnabled() async {
+    if (!_enabled) return false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_prefGlass) ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// 设置页的「窗口毛玻璃」开关。
+  Future<void> setGlassEnabled(bool value) async {
+    if (!_enabled) return;
+    await applyGlassFromPrefs(enabled: value);
+  }
+
+  /// 设置页的「关闭窗口时最小化到托盘」开关。
+  Future<bool> isMinimizeToTray() async {
+    if (!_enabled) return false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_prefMinimizeToTray) ?? true;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  Future<void> setMinimizeToTray(bool value) async {
+    if (!_enabled) return;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_prefMinimizeToTray, value);
+    WindowBridge.setMinimizeToTray(value);
   }
 
   Future<void> _refreshMenu() async {
