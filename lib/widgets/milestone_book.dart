@@ -326,7 +326,7 @@ class _MilestoneBookRowState extends State<MilestoneBookRow>
     // 收起滑动面板，避免燃烧期间残留敞开的删除窗格。
     await _slideCtrl.close();
     if (!context.mounted) return;
-    // 关键：先捕获条目 id——燃烧期间列表可能重排（同步轮询/置顶），
+    // 关键：先捕获条目 id，燃烧期间列表可能重排（同步轮询/置顶），
     // widget 会被重绑到别的数据上，落库必须用打开确认框时的那条。
     final id = widget.milestone.id;
     final title = widget.milestone.title;

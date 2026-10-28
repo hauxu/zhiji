@@ -180,7 +180,7 @@ class Reminders {
     } catch (_) {}
 
     // 超级岛模式（实验）：任务/倒数日改走原生焦点通知，与普通通知互斥。
-    // 判定只读 prefs 缓存——后台维护闹钟的 isolate 没有插件通道，
+    // 判定只读 prefs 缓存，后台维护闹钟的 isolate 没有插件通道，
     // 且岛闹钟由原生清单独立存活，重排时无需（也无法）触碰。
     final prefs = await SharedPreferences.getInstance();
     final islandOn = Platform.isAndroid &&
@@ -350,7 +350,7 @@ class Reminders {
     final now = tz.TZDateTime.now(tz.local);
     var next = tz.TZDateTime(tz.local, now.year, now.month, now.day, 0, 5);
     if (!next.isAfter(now)) next = next.add(const Duration(days: 1));
-    // 精确闹钟被拒（Android 14+ 新装默认拒绝）时降级为非精确——
+    // 精确闹钟被拒（Android 14+ 新装默认拒绝）时降级为非精确，
     // 维护闹钟晚几分钟无所谓，但不能静默丢失。
     var exact = true;
     try {

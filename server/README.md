@@ -6,6 +6,7 @@
 
 ```sh
 # 证书（换成自己的域名）
+sudo mkdir -p /opt/goalday-sync/certs
 openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
   -keyout /opt/goalday-sync/certs/sync.key \
   -out /opt/goalday-sync/certs/sync.crt -subj "/CN=your.server.com"
@@ -19,6 +20,7 @@ sudo chmod 750 /opt/goalday-sync/certs
 sudo chmod 640 /opt/goalday-sync/certs/*
 
 # 环境变量写进 /etc/goalday-sync/env，systemd 示例见 goalday-sync.service
+# 示例假定代码在 /opt/goalday-sync，按实际路径改 ExecStart
 sudo -E python3 server/server.py
 ```
 
@@ -47,3 +49,4 @@ sudo -E python3 server/server.py
 ## 许可
 
 AGPL-3.0，全文见 [LICENSE](LICENSE)。客户端是 GPL-3.0；把改过的服务端部署成对外服务时，也要公开改过的源码。
+

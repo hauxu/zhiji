@@ -869,7 +869,7 @@ class SyncService extends ChangeNotifier {
   }
 
   /// 已读回执上报值：留言未读清零、留言板可见且前台才算「真的看到了」。
-  /// 只看未读计数会误报——冷启动首同步静默采纳、后台闹钟都没真正展示消息。
+  /// 只看未读计数会误报，冷启动首同步静默采纳、后台闹钟都没真正展示消息。
   /// 只按未读留言判断：评价/完成动态（unseenCount）不该挡住留言已读。
   static int? readUpToValue({
     required int unreadMessages,
@@ -941,7 +941,7 @@ class SyncService extends ChangeNotifier {
 
   /// 退后台或进程被系统结束后的兜底：精确闹钟唤醒后台 isolate 轻量同步。
   /// 保活服务负责秒级送达；闹钟兜住「保活被系统或用户干掉」的情况，
-  /// 周期保持 2 分钟——保活活着时它只是多唤醒一次，代价可接受。
+  /// 周期保持 2 分钟，保活活着时它只是多唤醒一次，代价可接受。
   static const _alarmPeriodic = Duration(minutes: 2);
 
   /// 会话状态变化（登录/绑定/解绑/退出）后重算保活与轮询。
@@ -963,7 +963,7 @@ class SyncService extends ChangeNotifier {
 
   Future<void> _setAlarmEnabled(bool on) async {
     if (!loggedIn) return;
-    // 精确闹钟被拒（Android 14+ 新装默认拒绝）时降级为非精确——
+    // 精确闹钟被拒（Android 14+ 新装默认拒绝）时降级为非精确，
     // 兜底同步晚几分钟到，也远好于静默丢失。
     var exact = true;
     try {
@@ -1083,7 +1083,7 @@ class SyncService extends ChangeNotifier {
     if (!isBound) return;
     // syncNow 内部已经通过 onEvent 把新留言/评价弹过了（界面引擎与保活
     // 引擎都挂了 onEvent）。只有独立的闹钟 isolate 没有 onEvent，
-    // 才需要在这里自己弹——否则同一条留言会弹两三次。
+    // 才需要在这里自己弹，否则同一条留言会弹两三次。
     if (onEvent == null) {
       final fresh = messages
           .where((m) =>
@@ -1416,7 +1416,7 @@ class SyncService extends ChangeNotifier {
         return;
       }
       // 长轮询唤醒信号：只带回新版本号、不带数据。保持旧游标不推进，
-      // 下一轮（约 1 秒后）since 不匹配即取回全量——若在此推进游标，
+      // 下一轮（约 1 秒后）since 不匹配即取回全量，若在此推进游标，
       // 触发唤醒的那次变更将永远没有机会下发。
       if (result['woken'] == true) {
         lastSyncAt = DateTime.now().millisecondsSinceEpoch;
@@ -1592,7 +1592,7 @@ class SyncService extends ChangeNotifier {
   Future<void> _applySyncResult(Map<String, dynamic> result, {required bool pushed}) async {
     final events = <CoupleEvent>[];
     // 本方法内有多个 await（解密/派生/落盘），期间会话可能已切换
-    // （登出/解绑）——认领分支前必须复核，防止已清状态被复活。
+    // （登出/解绑），认领分支前必须复核，防止已清状态被复活。
     final applyEpoch = _bindEpoch;
     final applyToken = token;
     bool sessionStale() => applyEpoch != _bindEpoch || applyToken != token;
@@ -1615,7 +1615,7 @@ class SyncService extends ChangeNotifier {
                     ? ownRaw['shared_key'] as String
                     : null);
         if (readable == null) {
-          // 注意：这里不能因为「本机看起来未配对」就覆盖云端。
+          // 这里不能因为「本机看起来未配对」就覆盖云端。
           // 换新手机登录已绑定账号时，本地 status 在认领之前仍是 unbound，
           // 一旦放行就会用新的随机密钥把旧备份盖掉，旧恢复码从此作废。
           // 解绑后的重推交给 unbind() 和「检测到解绑」两条路径处理。
@@ -1667,7 +1667,7 @@ class SyncService extends ChangeNotifier {
       for (final e in events) { onEvent?.call(e); }
       // 只有确实从绑定态掉下来才立刻用本机密钥重推一次：云端那个槽还是
       // 共享密钥加密的，不重推的话下一轮会被守卫判成「备份锁住了」。
-      // 本来就没有房间的账号（未配对、纯云备份）不能走这里——每轮拉取都
+      // 本来就没有房间的账号（未配对、纯云备份）不能走这里，每轮拉取都
       // 置脏重推会变成每 3 秒一次的无限推送。
       if (wasBound) {
         _dirty = true;
@@ -1800,7 +1800,7 @@ class SyncService extends ChangeNotifier {
       await _upgradeToX25519Key(partnerPub);
     }
     if (status == CoupleStatus.waiting) {
-      // 绑定码以服务端为准；服务端 24h 轮换后也要跟着更新缓存——
+      // 绑定码以服务端为准；服务端 24h 轮换后也要跟着更新缓存，
       // 配对时双方用同一码派生情侣密钥，旧码会导致密钥不一致。
       final serverCode = result['myCode'] as String?;
       if (serverCode != null && serverCode != myCode) {
@@ -2866,7 +2866,7 @@ class SyncService extends ChangeNotifier {
         }
       }
       // 对方公钥变了：这是我们第一次见到它就直接记下来（绑定码是当面/当面
-      // 转发的，这一次的信任作为基准）；之后如果又变了，不自动换密钥——
+      // 转发的，这一次的信任作为基准）；之后如果又变了，不自动换密钥，
       // 恶意服务端可以伪造公钥，把共享数据变成它也能解的内容。改由用户确认。
       if (_couplePeerPubPinned.isEmpty) {
         _couplePeerPubPinned = partnerPubKey;
@@ -3058,7 +3058,7 @@ class SyncService extends ChangeNotifier {
     final t = text.trim();
     if (t.isEmpty || !isBound) return false;
     // 已配对却没有共享密钥：不能明文发出去。返回 false 让调用方保留草稿，
-    // 不要在这里抛异常——调用方会清输入框，用户打的字就没了。
+    // 不要在这里抛异常，调用方会清输入框，用户打的字就没了。
     if (coupleKeyBase64.isEmpty) {
       lastError = '共享密钥还没就绪，先在「我的 → 云端备份」里解锁备份，或重新登录后再发';
       notifyListeners();

@@ -70,7 +70,7 @@ class WindowsShell with TrayListener {
       await acrylic.Window.initialize();
     } catch (_) {}
     // 先试亚克力（模糊 + 半透明，Win10/11 都支持），失败再退纯透明。
-    // 注意 color 必须带一点不透明度，全透明会被插件判为非法而退回透明模式。
+    // color 要带一点不透明度，全透明会被插件判为非法，退回透明模式。
     final light = WidgetsBinding.instance.platformDispatcher.platformBrightness ==
         Brightness.light;
     try {

@@ -2017,7 +2017,7 @@ class _HistoryCardState extends State<_HistoryCard> {
     final store = context.watch<AppStore>();
     final scheme = Theme.of(context).colorScheme;
     var entries = store.data.journal.values.toList();
-    // 混入 TA 分享的日记（只读）。同日键冲突也保留——多篇章键唯一后
+    // 混入 TA 分享的日记（只读）。同日键冲突也保留，多篇章键唯一后
     // TA 与自己同日共存是常态，用对象身份区分来源。
     final taEntries = <JournalEntry>{};
     widget.partnerEntries?.forEach((k, v) {

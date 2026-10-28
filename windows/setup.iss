@@ -40,7 +40,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 [Files]
 Source: "LICENSE-GPL.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; VC++ 运行库可选：仓库里不带这个 13MB 的安装包，需要的话自己下载放到本目录
+#if FileExists("vc_redist.x64.exe")
 Source: "vc_redist.x64.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall
+#endif
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"

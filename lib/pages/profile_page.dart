@@ -1736,7 +1736,7 @@ class _IslandLineState extends State<_IslandLine> {
           subtitle: Text(
             st == null
                 ? '正在检测设备…'
-                : '小米/红米/POCO 专属 · 到点提醒以灵动岛胶囊弹出 · $focusLabel'
+                : '小米/红米/POCO 支持 · 到点提醒以灵动岛胶囊弹出 · $focusLabel'
                       '${supported == false ? ' · 未检测到灵动岛开关' : ''}',
             style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
           ),

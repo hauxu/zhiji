@@ -117,7 +117,7 @@ class LicensesPage extends StatelessWidget {
                     const SizedBox(height: 8),
                     Text(
                       '以下组件采用 MIT、BSD 或 Apache-2.0 许可：可以免费使用、'
-                      '修改和再分发，只需保留原作者的版权与许可声明。'
+                      '修改和再分发，保留原作者的版权与许可声明。'
                       '这些组件按「现状」提供，不含任何担保。',
                       style: TextStyle(
                         fontSize: 13,

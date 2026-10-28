@@ -99,7 +99,7 @@ Future<void> main() async {
         );
       }
     } else {
-      // 后台通知：保活引擎可能也收到同一条，统一入口会去重。
+      // 保活引擎也会收到同一条，这里按事件去重。
       sync.notifyCoupleEventOnce(event);
     }
   };
@@ -256,7 +256,7 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
     final effectiveDark = themeStore.darkMode || systemDark;
     final effectiveTheme = effectiveDark ? dark : light;
     // 启用全局背景时页面骨架转透明，让背景图从卡片缝隙透出；
-    // 区块（卡片）以 0.8 底色半透——背景从区块中也透出，
+    // 区块（卡片）以 0.8 底色半透，背景从区块中也透出，
     // 同时保留边框与底色保证区分度和文字可读性。
     final ui = context.watch<UiPrefs>();
     final bgOn =

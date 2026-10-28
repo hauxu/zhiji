@@ -38,7 +38,7 @@ void showInAppBanner({
       onTap: onTap,
       avatarPath: avatarPath,
       onClose: (close) => _activeClose = close,
-      // 收起动画完成后只移除自己——此刻可能有新横幅已插入。
+      // 收起动画完成后只移除自己，此刻可能有新横幅已插入。
       onDismissed: () {
         if (identical(_bannerEntry, entry)) _bannerEntry = null;
         final e = entry;

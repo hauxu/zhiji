@@ -25,7 +25,7 @@ class MagnetAction {
 /// （索引相对 children 当前顺序）。children 必须带稳定 Key。
 ///
 /// 拖动观感由根层代理呈现（RepaintBoundary 截图跟随手指），
-/// 原位是等高占位块——不存在 Z 序重叠，也不会拖出列表范围。
+/// 原位是等高占位块，不存在 Z 序重叠，也不会拖出列表范围。
 class MagnetReorder extends StatefulWidget {
   const MagnetReorder({
     super.key,

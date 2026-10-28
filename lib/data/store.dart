@@ -1711,7 +1711,7 @@ class AppStore extends ChangeNotifier {
   }
 
   /// 从回收站恢复一篇日记到原位。同键已有新内容时不覆盖（返回 false）。
-  /// 恢复会把 updatedAt 提到现在并清除本机墓碑——墓碑合并已改为按时间
+  /// 恢复会把 updatedAt 提到现在并清除本机墓碑，墓碑合并已改为按时间
   /// 比较，删除之后重新写入的条目可以穿透墓碑同步到其他设备。
   bool restoreJournalTrash(String storageKey) {
     final i =
