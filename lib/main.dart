@@ -85,7 +85,7 @@ Future<void> main() async {
   sync.onEvent = (CoupleEvent event) {
     // 设备确认码：模态展示（60 秒一次性，双方核对即确认设备可信）。
     if (event.title == '设备确认码') {
-      showTopToast('设备确认码 ${event.body}，1 分钟内有效；双方核对一致即确认设备可信');
+      showTopToast('设备确认码 ${event.body}（1 分钟内有效）');
       return;
     }
     if (sync.isForeground) {

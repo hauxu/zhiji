@@ -1329,7 +1329,7 @@ class SyncService extends ChangeNotifier {
         }
         // 共享密钥缺失：这轮不推共享包，避免把内容明文送到服务端。
         if (_sharedKeyMissing) {
-          lastError = '共享密钥未就绪，已暂缓上传（在「我的 → 云端备份」里解锁备份，或重新登录后会自动补齐）';
+          lastError = '共享密钥未就绪，已暂缓上传';
           snapshot = null;
           push = false;
         }

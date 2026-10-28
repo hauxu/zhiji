@@ -52,7 +52,7 @@ class _JournalSharePageState extends State<JournalSharePage> {
     if (data == null) throw Exception('图片编码失败');
     final bytes = data.buffer.asUint8List();
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/judging_diary_${dateKey(widget.date)}.png');
+    final file = File('${dir.path}/zhiji_diary_${dateKey(widget.date)}.png');
     await file.writeAsBytes(bytes);
     return file;
   }
@@ -68,7 +68,7 @@ class _JournalSharePageState extends State<JournalSharePage> {
       if (Platform.isAndroid) {
         final saved = await GallerySaver.saveImage(
           src.path,
-          name: 'judging_diary_${dateKey(widget.date)}.png',
+          name: 'zhiji_diary_${dateKey(widget.date)}.png',
         );
         if (saved != null) {
           if (!mounted) return;
@@ -80,7 +80,7 @@ class _JournalSharePageState extends State<JournalSharePage> {
           final destDir = Directory('${dir.path}/saved_diary');
           await destDir.create(recursive: true);
           final dest = File(
-            '${destDir.path}/judging_diary_${dateKey(widget.date)}.png',
+            '${destDir.path}/zhiji_diary_${dateKey(widget.date)}.png',
           );
           await src.copy(dest.path);
           if (!mounted) return;
@@ -88,11 +88,11 @@ class _JournalSharePageState extends State<JournalSharePage> {
           return;
         }
       }
-      // Windows（及其它桌面端）保持原逻辑：写 Pictures/judging。
+      // Windows（及其它桌面端）保持原逻辑：写 Pictures/Zhiji。
       Directory destDir;
       if (Platform.isWindows) {
         final home = Platform.environment['USERPROFILE'] ?? '';
-        destDir = Directory('$home/Pictures/judging');
+        destDir = Directory('$home/Pictures/Zhiji');
       } else {
         destDir = Directory(
           '${(await getApplicationDocumentsDirectory()).path}/saved_diary',
@@ -100,7 +100,7 @@ class _JournalSharePageState extends State<JournalSharePage> {
       }
       await destDir.create(recursive: true);
       final dest = File(
-        '${destDir.path}/judging_diary_${dateKey(widget.date)}.png',
+        '${destDir.path}/zhiji_diary_${dateKey(widget.date)}.png',
       );
       await src.copy(dest.path);
       if (!mounted) return;
