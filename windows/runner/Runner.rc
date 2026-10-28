@@ -92,9 +92,9 @@ BEGIN
             VALUE "CompanyName", "com.huaxu" "\0"
             VALUE "FileDescription", "之计" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "judging" "\0"
+            VALUE "InternalName", "zhiji" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.huaxu. All rights reserved." "\0"
-            VALUE "OriginalFilename", "judging.exe" "\0"
+            VALUE "OriginalFilename", "zhiji.exe" "\0"
             VALUE "ProductName", "之计" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END

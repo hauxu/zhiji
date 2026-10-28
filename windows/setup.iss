@@ -3,9 +3,13 @@
 
 #define MyAppName "之计"
 #define MyAppNameEn "Judging"
-#define MyAppVersion "5.16.21"
-#define MyAppExeName "judging.exe"
+#define MyAppVersion "5.16.22"
+#define MyAppExeName "zhiji.exe"
 #define MyAppId "{{8E4F5C2A-9B71-4D3E-A0C6-5A1B2C3D4E5F}"
+
+[InstallDelete]
+; 旧版本的可执行文件换个名字后要清掉，免得留两个
+Type: files; Name: "{app}\judging.exe"
 
 [Setup]
 AppId={#MyAppId}

@@ -28,7 +28,7 @@ if (-not $SkipBuild) {
   if ($LASTEXITCODE -ne 0) { throw "flutter build windows failed" }
 }
 
-$zipName = "judging-v$version-windows-portable.zip"
+$zipName = "zhiji-v$version-windows-portable.zip"
 $zipPath = Join-Path $dist $zipName
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 $stage = Join-Path $env:TEMP "gd_win_stage_$version"
