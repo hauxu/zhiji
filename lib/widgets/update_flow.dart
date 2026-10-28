@@ -155,8 +155,11 @@ Future<void> installReadyPackage(BuildContext context) async {
   if (path == null || !File(path).existsSync()) return;
   try {
     if (Platform.isWindows && path.toLowerCase().endsWith('.zip')) {
-      // Windows 便携版：解包到同名目录后打开。
-      final destPath = path.substring(0, path.length - 4);
+      // 解到专门的目录，别碰用户自己的同名文件夹。
+      // 目录名带版本号，重复解包也只覆盖自己上一次的结果。
+      final version = (st?.latest ?? '').replaceAll(RegExp(r'[^0-9A-Za-z._-]'), '');
+      final destPath = '${File(path).parent.path}${Platform.pathSeparator}'
+          'zhiji-${version.isEmpty ? 'update' : version}';
       final destDir = Directory(destPath);
       if (destDir.existsSync()) {
         destDir.deleteSync(recursive: true);

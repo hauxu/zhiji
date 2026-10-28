@@ -100,7 +100,7 @@ class SyncService extends ChangeNotifier {
   static const _maxBackoffForeground = Duration(seconds: 15);
   /// 客户端版本：随 sync 请求上报；服务端在账号有加密备份时据此拒绝旧版 push。
   /// 发版时须与 pubspec.yaml 的 version 保持一致（只取 x.y.z）。
-  static const clientVersion = '5.16.22';
+  static const clientVersion = '5.16.23';
   int _failStreak = 0; // 连续网络类失败次数，驱动指数退避
   bool _offline = false;
   bool _boardVisible = false;
@@ -565,11 +565,15 @@ class SyncService extends ChangeNotifier {
     if (partner != null) {
       await prefs.setString('gd2_partner', jsonEncode(partner!.toJson()));
     } else { await prefs.remove('gd2_partner'); }
+    // 落盘上限与内存一致，否则重启后历史会被悄悄砍掉。
     await prefs.setString('gd2_comments',
-        jsonEncode(comments.take(300).map((c) => c.toJson()).toList()));
+        jsonEncode(comments.take(1200).map((c) => c.toJson()).toList()));
     await prefs.setString('gd2_messages',
         jsonEncode(messages.length > 2000
-            ? messages.sublist(messages.length - 500).map((m) => m.toJson()).toList()
+            ? messages
+                .sublist(messages.length - 2000)
+                .map((m) => m.toJson())
+                .toList()
             : messages.map((m) => m.toJson()).toList()));
     await prefs.setInt('gd2_unseen', unseenCount);
     await prefs.setInt('gd2_unread_msg', unreadMessages);
@@ -1757,47 +1761,52 @@ class SyncService extends ChangeNotifier {
       unawaited(syncNow(push: true, manual: true));
     }
     // 双方都上报了协商公钥时升级为 X25519 派生密钥（旧配对没有私钥，保持不变）。
+    final partnerPub = result['partnerPubKey'];
     final partnerIdPub = result['partnerIdentityPub'];
-    if (partnerIdPub is String &&
-        partnerIdPub.isNotEmpty &&
-        isBound) {
-      final peerPub = result['partnerPubKey'];
-      final peerSig = result['partnerPubKeySig'];
-      if (peerPub is String && peerPub.isNotEmpty && peerSig is String &&
-          peerSig.isNotEmpty) {
-        final ok = await JournalCrypto.verifyIdentity(
-            partnerIdPub, base64Decode(peerPub), peerSig);
+    // 对方公钥只有在验过签名（或对方还是没有身份密钥的老版本）之后才允许用。
+    // 验签不过就一律不动：不固定、不协商、不改共享密钥。
+    var peerPubTrusted = partnerPub is String &&
+        partnerPub.isNotEmpty &&
+        isBound;
+    if (peerPubTrusted) {
+      final hasIdentity = partnerIdPub is String && partnerIdPub.isNotEmpty;
+      if (hasIdentity) {
+        final peerSig = result['partnerPubKeySig'];
+        var ok = false;
+        if (peerSig is String && peerSig.isNotEmpty) {
+          ok = await JournalCrypto.verifyIdentity(
+              partnerIdPub, base64Decode(partnerPub), peerSig);
+        }
         if (!ok) {
-          // 对方身份公钥对不上公钥签名：要么服务端改了公钥，要么数据坏了。
-          // 这种情况绝不换密钥，只提示。
+          // 签名缺失或对不上：公钥可能是服务端换的，按不可信处理。
+          peerPubTrusted = false;
           identityKeyChanged = true;
           await _persist();
           notifyListeners();
-          lastError = '对方公钥的签名验证失败，已暂停更新共享密钥';
+          lastError = '对方公钥验签失败，已暂停更新共享密钥';
           _raiseIdentityIssueOnce();
-        } else {
-          if (_peerIdentityPubB64.isEmpty) {
-            _peerIdentityPubB64 = partnerIdPub;
-            await _persist();
-          } else if (_peerIdentityPubB64 != partnerIdPub) {
-            // 身份公钥变了（换手机并重新生成身份），同样只提示不自动跟随。
-            identityKeyChanged = true;
-            await _persist();
-            notifyListeners();
-            _raiseIdentityIssueOnce();
-          }
+        } else if (_peerIdentityPubB64.isEmpty) {
+          _peerIdentityPubB64 = partnerIdPub;
+          await _persist();
+        } else if (_peerIdentityPubB64 != partnerIdPub) {
+          // 身份公钥换了（换机重装）：先不跟随，等用户核对安全码。
+          peerPubTrusted = false;
+          identityKeyChanged = true;
+          await _persist();
+          notifyListeners();
+          _raiseIdentityIssueOnce();
         }
       }
     }
-    final partnerPub = result['partnerPubKey'];
-    if (partnerPub is String && partnerPub.isNotEmpty) {
-      // TOFU：第一次知道对方公钥就固定下来，不管密钥是哪条路径派生的。
-      // 被邀请的一方（绑定码派生）以前没有基准，等于谁都能冒充。
-      if (_couplePeerPubPinned.isEmpty && isBound) {
+    if (peerPubTrusted && partnerPub is String) {
+      // TOFU 基线放在验签之后，避免把未经认证的公钥当成基准。
+      if (_couplePeerPubPinned.isEmpty) {
         _couplePeerPubPinned = partnerPub;
         await _persist();
       }
-      await _upgradeToX25519Key(partnerPub);
+      final peerHasIdentity =
+          partnerIdPub is String && partnerIdPub.isNotEmpty;
+      await _upgradeToX25519Key(partnerPub, promoteMain: peerHasIdentity);
     }
     if (status == CoupleStatus.waiting) {
       // 绑定码以服务端为准；服务端 24h 轮换后也要跟着更新缓存，
@@ -2123,7 +2132,10 @@ class SyncService extends ChangeNotifier {
             return null;
           }
         }
-        return Map<String, dynamic>.from((raw['shared'] as Map?) ?? {});
+        // v2 的 shared 必须是密文。服务端可以把 shared_enc 改成 false 再塞
+        // 一份伪造的任务/清单，所以这里只认密文，明文一律当读不出来。
+        debugPrint('v2 snapshot without shared_enc, ignored');
+        return null;
       }
       final copy = Map<String, dynamic>.from(raw as Map);
       final journal = copy['journal'];
@@ -2211,9 +2223,11 @@ class SyncService extends ChangeNotifier {
           try {
             // 换过恢复码时 coupleKeyEnc 可能还是旧密钥加密的。
             final ckPlain = await _tryDecryptJournal(ckEnc);
-            if (ckPlain != null) coupleKeyBase64 = ckPlain;
-            await _persist();
-            recovered = true;
+            if (ckPlain != null) {
+              coupleKeyBase64 = ckPlain;
+              await _persist();
+              recovered = true;
+            }
           } catch (_) {}
         }
         if (!recovered) {
@@ -2271,6 +2285,10 @@ class SyncService extends ChangeNotifier {
           copy['_sharedLocked'] = true;
           return copy;
         }
+      } else if (raw['v'] == 2) {
+        // v2 备份的 shared 只可能是密文；明文说明被改过，按锁定处理。
+        copy['_sharedLocked'] = true;
+        return copy;
       } else {
         shared = Map<String, dynamic>.from((raw['shared'] ?? {}) as Map);
       }
@@ -2821,7 +2839,8 @@ class SyncService extends ChangeNotifier {
   }
 
   /// 双方公钥齐备后派生 v2 共享密钥；旧密钥留作历史密文解密回退。
-  Future<void> _upgradeToX25519Key(String partnerPubKey) async {
+  Future<void> _upgradeToX25519Key(String partnerPubKey,
+      {bool promoteMain = false}) async {
     if (accountId == null || partnerAccountId == null) return;
     // 对方换过密钥对（重装/换机）后协商结果会变：即便已经升到 v2，
     // 也要用新公钥重算一次，把结果放进备用密钥，否则对方新推的内容解不开。
@@ -2853,14 +2872,33 @@ class SyncService extends ChangeNotifier {
         unawaited(syncNow(push: true, manual: true));
         return;
       }
-      // 本机已经有共享密钥（例如换机后从 coupleKeyEnc 恢复出来的）。
-      // 这时再切换成协商出的新密钥会造成单向分叉：对方那边 ver 已是 2，
-      // 不会再重算，从此解不开我们推上去的数据。
-      // 保留原密钥作主密钥，把协商结果当备用密钥，两个方向都还能读。
-      // 对方换了密钥对：新协商结果先收进候选。
+      // 对方也是带身份密钥的新版本：把协商结果升为主密钥。
+      // 绑定码由服务端生成，主密钥停在它派生的 PBKDF2 值上等于把钥匙交给服务端。
+      if (promoteMain) {
+        final oldMain = coupleKeyBase64;
+        final oldLegacy = coupleKeyLegacyB64;
+        coupleKeyBase64 = key;
+        _coupleKeyVer = 2;
+        // 旧密钥全部进候选位，历史密文仍然解得开。
+        for (final old in [oldMain, oldLegacy]) {
+          if (old.isEmpty || old == key) continue;
+          coupleKeyExtras.remove(old);
+          coupleKeyExtras.add(old);
+        }
+        coupleKeyLegacyB64 = '';
+        coupleKeyExtras.remove(key);
+        while (coupleKeyExtras.length > 12) {
+          coupleKeyExtras.removeAt(0);
+        }
+        await _persist();
+        notifyListeners();
+        // 换钥匙后用新密钥重推一次，对方下一轮同步跟上来。
+        _dirty = true;
+        unawaited(syncNow(push: true, manual: true));
+        return;
+      }
       if (!_isKnownCoupleKey(key)) {
         coupleKeyExtras.add(key);
-        // 只留最近四代，避免列表无限长。
         while (coupleKeyExtras.length > 12) {
           coupleKeyExtras.removeAt(0);
         }

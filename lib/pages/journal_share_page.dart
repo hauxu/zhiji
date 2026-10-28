@@ -177,15 +177,17 @@ class _JournalSharePageState extends State<JournalSharePage> {
   Future<void> _shareTo(String package) async {
     if (_sharing) return;
     setState(() => _sharing = true);
+    File? tmp;
     try {
-      final file = await _generateImage();
-      if (!await NativeShare.shareImageTo(file.path, package)) {
+      tmp = await _generateImage();
+      if (!await NativeShare.shareImageTo(tmp.path, package)) {
         // 指定应用分享失败时退回系统分享面板，不再额外打断用户。
-        await Share.shareXFiles([XFile(file.path, mimeType: 'image/png')]);
+        await Share.shareXFiles([XFile(tmp.path, mimeType: 'image/png')]);
       }
     } catch (e) {
       showTopToast('分享失败：$e');
     } finally {
+      await _dropTemp(tmp);
       if (context.mounted) setState(() => _sharing = false);
     }
   }
@@ -193,14 +195,15 @@ class _JournalSharePageState extends State<JournalSharePage> {
   Future<void> _share() async {
     if (_sharing) return;
     setState(() => _sharing = true);
+    File? tmp;
     try {
-      final file = await _generateImage();
+      tmp = await _generateImage();
       // Android 优先原生 ACTION_SEND：厂商分享框架（MagicOS 等）接管。
-      if (Platform.isAndroid && await NativeShare.shareImage(file.path)) {
+      if (Platform.isAndroid && await NativeShare.shareImage(tmp.path)) {
         return;
       }
       // 纯图片 intent：不带文字，避免部分 ROM 只显示文字类分享目标。
-      await Share.shareXFiles([XFile(file.path, mimeType: 'image/png')]);
+      await Share.shareXFiles([XFile(tmp.path, mimeType: 'image/png')]);
     } catch (e) {
       // 图片失败时退化为文字分享。
       try {
@@ -212,8 +215,17 @@ class _JournalSharePageState extends State<JournalSharePage> {
         showTopToast('分享失败：$e2');
       }
     } finally {
+      await _dropTemp(tmp);
       if (context.mounted) setState(() => _sharing = false);
     }
+  }
+
+  /// 分享完就删临时图，别把日记图片留在缓存目录里。
+  Future<void> _dropTemp(File? f) async {
+    if (f == null) return;
+    try {
+      if (await f.exists()) await f.delete();
+    } catch (_) {}
   }
 
   String _plainText() {

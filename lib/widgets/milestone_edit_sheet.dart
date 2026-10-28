@@ -280,6 +280,12 @@ class _MilestoneEditSheetState extends State<_MilestoneEditSheet> {
   }
 
   @override
+  void dispose() {
+    _title.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final dirty = _dirty;

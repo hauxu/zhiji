@@ -95,8 +95,11 @@ Future<void> showRecoveryCodesSheet(
                     style: FilledButton.styleFrom(
                       minimumSize: const Size.fromHeight(46),
                     ),
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: codes.join(' ')));
+                    onPressed: () async {
+                      await Clipboard.setData(
+                        ClipboardData(text: codes.join(' ')),
+                      );
+                      showTopToast('已复制');
                     },
                     icon: const Icon(Icons.copy_rounded, size: 18),
                     label: const Text('复制'),
@@ -229,16 +232,22 @@ Future<void> showRecoverySetupFlow(BuildContext context) async {
       child: Center(child: CircularProgressIndicator(color: scheme.primary)),
     ),
   );
-  List<String> codes;
+  List<String>? codes;
+  Object? error;
   try {
     codes = await sync.generateRecoveryCodes();
   } catch (e) {
-    if (!context.mounted) return;
-    Navigator.of(context, rootNavigator: true).pop();
-    showTopToast('生成失败：$e');
-    return;
+    error = e;
+  } finally {
+    // 进度框必须关掉，否则界面卡在不可返回的弹窗上。
+    if (context.mounted) {
+      Navigator.of(context, rootNavigator: true).pop();
+    }
   }
   if (!context.mounted) return;
-  Navigator.of(context, rootNavigator: true).pop();
+  if (codes == null) {
+    showTopToast('生成失败：$error');
+    return;
+  }
   await showRecoveryCodesSheet(context, codes);
 }

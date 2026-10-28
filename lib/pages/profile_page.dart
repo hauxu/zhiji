@@ -360,7 +360,9 @@ class _ProfilePageState extends State<ProfilePage> {
     };
     rows.add((
       'theme',
-      '莫奈取色 ${themeStore.useDynamic ? '开' : '关'} · $darkDesc',
+      Platform.isWindows
+          ? '固定品牌色 · $darkDesc'
+          : '莫奈取色 ${themeStore.useDynamic ? '开' : '关'} · $darkDesc',
     ));
     rows.add(('sync', sync.loggedIn ? '已登录 ${sync.username}' : '未登录'));
     if (mounted) {

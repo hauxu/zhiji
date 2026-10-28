@@ -146,8 +146,13 @@ class _EntitySheetState extends State<_EntitySheet> {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
     if (widget.exists(name)) {
-      Navigator.of(context).pop();
-      showTopToast('已有同名「$name」，换个名字');
+      // 重名不关弹层：已输入的内容和选项都还在，选中文字直接改名即可。
+      showTopToast('已有同名「$name」');
+      _nameController.selection = TextSelection(
+        baseOffset: 0,
+        extentOffset: _nameController.text.length,
+      );
+      setState(() {});
       return;
     }
     Navigator.of(context).pop();
