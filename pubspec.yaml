@@ -1,6 +1,7 @@
 name: goalday
-description: "之计 (judging)：两个人一起用的手帐风计划应用，含清单、计划、习惯、日记与情侣同步。"
+description: "之计：两个人的手帐风计划应用，含清单、计划、习惯、日记与情侣同步。"
 homepage: https://www.huaxu.xin/zhiji/
+repository: https://github.com/hauxu/zhiji
 publish_to: 'none'
 version: 5.16.22+130
 
