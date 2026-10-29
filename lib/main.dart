@@ -274,6 +274,13 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
             navigationBarTheme: effectiveTheme.navigationBarTheme.copyWith(
               backgroundColor: Colors.transparent,
             ),
+            // 侧边导航（宽屏的 NavigationRail）如果还带默认底色，会在
+            // 窗口左侧糊成一整块实心，毛玻璃只剩右边一条。
+            navigationRailTheme: const NavigationRailThemeData(
+              backgroundColor: Colors.transparent,
+              useIndicator: true,
+            ),
+            drawerTheme: const DrawerThemeData(backgroundColor: Colors.transparent),
             cardTheme: effectiveTheme.cardTheme.copyWith(
               color: effectiveTheme.colorScheme.surfaceContainerLow.withValues(
                 alpha: 0.92,
@@ -290,8 +297,9 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         WindowBridge.setTheme(
           dark: effectiveDark,
-          // 开毛玻璃时不写标题栏底色，交给 DWM 与背景混合。
-          caption: glassOn ? -1 : _argb(effectiveTheme.colorScheme.surface),
+          // 标题栏底色用主题表面色：DWM 的标题栏不支持透明，
+          // 不写就是一片黑，写主题色至少和内容连得上。
+          caption: _argb(effectiveTheme.colorScheme.surface),
           captionText: _argb(effectiveTheme.colorScheme.onSurface),
         );
       });

@@ -37,7 +37,7 @@ New-Item -ItemType Directory -Force -Path $stage | Out-Null
 Copy-Item "$release\*" $stage -Recurse -Force
 $vc = Join-Path $root "windows\vc_redist.x64.exe"
 if (Test-Path $vc) { Copy-Item $vc $stage -Force }
-$readme = Join-Path $root "windows\使用说明.txt"
+$readme = Join-Path $root "windows\readme-win.txt"
 if (Test-Path $readme) { Copy-Item $readme $stage -Force }
 Compress-Archive -Path "$stage\*" -DestinationPath $zipPath -CompressionLevel Optimal
 Remove-Item $stage -Recurse -Force

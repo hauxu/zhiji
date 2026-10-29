@@ -69,23 +69,34 @@ class WindowsShell with TrayListener {
     try {
       await acrylic.Window.initialize();
     } catch (_) {}
-    // 先试亚克力（模糊 + 半透明，Win10/11 都支持），失败再退纯透明。
-    // color 要带一点不透明度，全透明会被插件判为非法，退回透明模式。
+    // Win11 22H2 之后优先 Mica：它会把窗框一起铺材质，标题栏不另外画底色，
+    // 边框也就不是一条黑的。老系统退亚克力，再不行纯透明。
     final light = WidgetsBinding.instance.platformDispatcher.platformBrightness ==
         Brightness.light;
-    try {
-      await acrylic.Window.setEffect(
-        effect:
-            on ? acrylic.WindowEffect.acrylic : acrylic.WindowEffect.disabled,
-        color: light ? const Color(0x40F4F1EA) : const Color(0x400E1014),
-      );
+    if (on) {
+      // 亚克力模糊的是窗口后面的内容，Mica 模糊的是桌面壁纸；
+      // 用户要的是"看得见后面窗口的轮廓"，所以亚克力优先。
+      try {
+        await acrylic.Window.setEffect(
+          effect: acrylic.WindowEffect.acrylic,
+          color: light ? const Color(0x2EF4F1EA) : const Color(0x2E0E1014),
+        );
+        return;
+      } catch (_) {}
+      try {
+        await acrylic.Window.setEffect(effect: acrylic.WindowEffect.mica);
+        return;
+      } catch (_) {}
+      try {
+        await acrylic.Window.setEffect(
+          effect: acrylic.WindowEffect.transparent,
+        );
+        return;
+      } catch (_) {}
       return;
-    } catch (_) {}
+    }
     try {
-      await acrylic.Window.setEffect(
-        effect:
-            on ? acrylic.WindowEffect.transparent : acrylic.WindowEffect.disabled,
-      );
+      await acrylic.Window.setEffect(effect: acrylic.WindowEffect.disabled);
     } catch (_) {}
   }
 

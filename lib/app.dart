@@ -247,7 +247,7 @@ class _HomeShellState extends State<HomeShell> {
       setState(() => _pageIndex = pageIndex);
     }
 
-    return SlidableAutoCloseBehavior(
+    Widget shell = SlidableAutoCloseBehavior(
       child: ScrollConfiguration(
         behavior: const GoalDayScrollBehavior(),
         child: LayoutBuilder(
@@ -332,6 +332,8 @@ class _HomeShellState extends State<HomeShell> {
         ),
       ),
     );
+
+    return shell;
   }
 }
 
