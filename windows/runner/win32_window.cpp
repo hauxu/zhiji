@@ -253,16 +253,6 @@ Win32Window::MessageHandler(HWND hwnd,
       auto info = reinterpret_cast<MINMAXINFO*>(lparam);
       info->ptMinTrackSize.x = static_cast<LONG>(900 * scale_factor);
       info->ptMinTrackSize.y = static_cast<LONG>(640 * scale_factor);
-      // 自绘边框之后系统不知道哪块是可用的：最大化按工作区算，别盖住任务栏。
-      HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-      MONITORINFO mi{};
-      mi.cbSize = sizeof(mi);
-      if (GetMonitorInfo(monitor, &mi)) {
-        info->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
-        info->ptMaxPosition.y = mi.rcWork.top - mi.rcMonitor.top;
-        info->ptMaxSize.x = mi.rcWork.right - mi.rcWork.left;
-        info->ptMaxSize.y = mi.rcWork.bottom - mi.rcWork.top;
-      }
       return 0;
     }
 

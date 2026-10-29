@@ -325,8 +325,8 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
           wrapped = Stack(
             fit: StackFit.expand,
             children: [
-              // 雾面按主题色铺七成：太薄的话深色壁纸下字就看不清了。
-              ColoredBox(color: base.withValues(alpha: 0.94)),
+              // 页面底色压一层很薄的雾面：能看见后面的轮廓，又不影响读字。
+              ColoredBox(color: base.withValues(alpha: 0.35)),
               wrapped,
             ],
           );

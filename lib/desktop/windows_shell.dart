@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_acrylic/flutter_acrylic.dart' as acrylic;
 import 'package:launch_at_startup/launch_at_startup.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_acrylic/flutter_acrylic.dart' as acrylic;
 import 'package:tray_manager/tray_manager.dart';
 
 import '../util/window_bridge.dart';
@@ -58,42 +58,46 @@ class WindowsShell with TrayListener {
     await _refreshMenu();
   }
 
-  /// 读取设置并应用窗口材质。
-  /// 用 flutter_acrylic：它走 DWM 的亚克力/云母材质，有模糊和噪点，比手写 Accent 好看。
-  /// 设完把窗框扩展清零，否则系统标题栏会重新出现，和自绘标题栏叠成两层。
+  /// 读取设置并应用窗口材质：Win11 用 Mica，旧系统退亚克力。
+  /// 关掉开关就回到不透明窗口。
   Future<void> applyGlassFromPrefs({bool? enabled}) async {
     if (!_enabled) return;
     final prefs = await SharedPreferences.getInstance();
     final on = enabled ?? (prefs.getBool(_prefGlass) ?? true);
     await prefs.setBool(_prefGlass, on);
     glassEnabled.value = on;
-    final light = WidgetsBinding.instance.platformDispatcher.platformBrightness ==
-        Brightness.light;
     try {
       await acrylic.Window.initialize();
     } catch (_) {}
+    // Win11 22H2 之后优先 Mica：它会把窗框一起铺材质，标题栏不另外画底色，
+    // 边框也就不是一条黑的。老系统退亚克力，再不行纯透明。
+    final light = WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+        Brightness.light;
     if (on) {
+      // 亚克力模糊的是窗口后面的内容，Mica 模糊的是桌面壁纸；
+      // 用户要的是"看得见后面窗口的轮廓"，所以亚克力优先。
       try {
         await acrylic.Window.setEffect(
           effect: acrylic.WindowEffect.acrylic,
-          color: light ? const Color(0x40F4F1EA) : const Color(0x400E1014),
+          color: light ? const Color(0x2EF4F1EA) : const Color(0x2E0E1014),
         );
-      } catch (_) {
-        try {
-          await acrylic.Window.setEffect(effect: acrylic.WindowEffect.mica);
-        } catch (_) {
-          await WindowBridge.setBackdrop(
-            mode: 'acrylic',
-            tint: light ? 0xFFF4F1EA : 0xFF0E1014,
-          );
-        }
-      }
-      await WindowBridge.resetFrame();
-    } else {
-      try {
-        await acrylic.Window.setEffect(effect: acrylic.WindowEffect.disabled);
+        return;
       } catch (_) {}
+      try {
+        await acrylic.Window.setEffect(effect: acrylic.WindowEffect.mica);
+        return;
+      } catch (_) {}
+      try {
+        await acrylic.Window.setEffect(
+          effect: acrylic.WindowEffect.transparent,
+        );
+        return;
+      } catch (_) {}
+      return;
     }
+    try {
+      await acrylic.Window.setEffect(effect: acrylic.WindowEffect.disabled);
+    } catch (_) {}
   }
 
   Future<bool> isGlassEnabled() async {

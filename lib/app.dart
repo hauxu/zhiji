@@ -5,7 +5,6 @@ import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:provider/provider.dart';
 
 import 'data/store.dart';
-import 'desktop/windows_title_bar.dart';
 import 'main.dart';
 import 'pages/archived_page.dart';
 import 'pages/couple_page.dart';
@@ -334,14 +333,7 @@ class _HomeShellState extends State<HomeShell> {
       ),
     );
 
-    if (!Platform.isWindows) return shell;
-    // 顶部 38 是高自绘标题栏，原生侧把系统标题栏整个去掉了。
-    return Column(
-      children: [
-        const WindowsTitleBar(),
-        Expanded(child: shell),
-      ],
-    );
+    return shell;
   }
 }
 
