@@ -200,15 +200,30 @@ void FlutterWindow::HandleWindowMethod(
     HWND hwnd = GetHandle();
     bool applied = false;
     if (hwnd) {
-      // 把客户区扩展到整个窗口，毛玻璃才有地方显示。
-      MARGINS margins{-1, -1, -1, -1};
+      // 不要把 DWM 窗框扩到客户区：一扩系统标题栏就又画回来了。
+      MARGINS margins{0, 0, 0, 0};
       DwmExtendFrameIntoClientArea(hwnd, &margins);
-      if (mode == "mica") {
+      // 优先用系统材质：Win11 22H2 起 DWM 的原生亚克力带模糊和噪点，
+      // 比自己拿 Accent 抹一层要好看得多。
+      if (mode == "acrylic") {
+        int type = 3;  // DWMSBT_TRANSIENTWINDOW（亚克力）
+        if (SUCCEEDED(DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE,
+                                            &type, sizeof(type)))) {
+          applied = true;
+        }
+      }
+      if (!applied && mode == "mica") {
         int type = 2;  // DWMSBT_MAINWINDOW
         if (SUCCEEDED(DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE,
                                             &type, sizeof(type)))) {
           applied = true;
         }
+      }
+      // 深色主题要告诉 DWM，否则系统材质按浅色画。
+      if (applied) {
+        BOOL dark = (tint & 0x00FFFFFF) < 0x00808080 ? TRUE : FALSE;
+        DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &dark,
+                              sizeof(dark));
       }
       if (!applied && (mode == "mica" || mode == "acrylic")) {
         // 0xAABBGGRR 的 ABGR 顺序（Accent 用的是 0xAABBGGRR）。
@@ -262,6 +277,26 @@ void FlutterWindow::HandleWindowMethod(
     HWND hwnd = GetHandle();
     if (hwnd) {
       ::PostMessage(hwnd, WM_CLOSE, 0, 0);
+    }
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
+  if (method == "resetFrame") {
+    // flutter_acrylic 会把 DWM 窗框扩进客户区（系统标题栏会重新出现），
+    // 设完材质再清零，保持自绘标题栏。
+    HWND hwnd = GetHandle();
+    if (hwnd) {
+      MARGINS zero{0, 0, 0, 0};
+      DwmExtendFrameIntoClientArea(hwnd, &zero);
+      ::SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+      RECT rc{};
+      ::GetClientRect(hwnd, &rc);
+      if (child_content() != nullptr) {
+        ::MoveWindow(child_content(), rc.left, rc.top, rc.right - rc.left,
+                     rc.bottom - rc.top, TRUE);
+      }
     }
     result->Success(flutter::EncodableValue(true));
     return;
@@ -349,8 +384,7 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
     // 客户区铺满整个窗口：系统标题栏和边框都不要了，材质才能连成一片。
     case WM_NCCALCSIZE:
       if (wparam == TRUE) {
-        // 最大化时系统给的窗口矩形比屏幕还大 8px（预留边框），
-        // 这里直接把客户区对齐到工作区，内容才不会被屏幕边缘裁掉。
+        // 客户区 = 整个窗口；最大化时对齐工作区，别被屏幕边缘裁掉。
         auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
         if (::IsZoomed(hwnd)) {
           HMONITOR monitor = ::MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
