@@ -1,5 +1,9 @@
 #include "flutter_window.h"
 
+#include <windowsx.h>
+#include <cstdio>
+#include <string>
+
 #include <dwmapi.h>
 #include <objidl.h>
 #include <shobjidl_core.h>
@@ -79,6 +83,12 @@ FlutterWindow::~FlutterWindow() {}
 bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
+  }
+  // 明确按普通窗口排序，避免被其它工具或上次运行设成置顶。
+  HWND self = GetHandle();
+  if (self) {
+    ::SetWindowPos(self, HWND_NOTOPMOST, 0, 0, 0, 0,
+                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
   }
 
   RECT frame = GetClientArea();
@@ -257,6 +267,30 @@ void FlutterWindow::HandleWindowMethod(
     return;
   }
 
+  if (method == "closeWindow") {
+    // 走正常的 WM_CLOSE：收托盘、通知 Dart 侧都由那一条路径负责。
+    HWND hwnd = GetHandle();
+    if (hwnd) ::PostMessage(hwnd, WM_CLOSE, 0, 0);
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
+  if (method == "minimize") {
+    HWND hwnd = GetHandle();
+    if (hwnd) ::ShowWindow(hwnd, SW_MINIMIZE);
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
+  if (method == "toggleMaximize") {
+    HWND hwnd = GetHandle();
+    if (hwnd) {
+      ::ShowWindow(hwnd, ::IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+    }
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
   if (method == "hideToTray" || method == "showFromTray") {
     HWND hwnd = GetHandle();
     if (hwnd) {
@@ -310,6 +344,88 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // 自绘边框相关的消息要在转发给引擎之前处理，否则会被它先消费掉。
+  switch (message) {
+    // 客户区铺满整个窗口：系统标题栏和边框都不要了，材质才能连成一片。
+    case WM_NCCALCSIZE:
+      if (wparam == TRUE) {
+        // 最大化时系统给的窗口矩形比屏幕还大 8px（预留边框），
+        // 这里直接把客户区对齐到工作区，内容才不会被屏幕边缘裁掉。
+        auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+        if (::IsZoomed(hwnd)) {
+          HMONITOR monitor = ::MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+          MONITORINFO mi{};
+          mi.cbSize = sizeof(mi);
+          if (::GetMonitorInfo(monitor, &mi)) {
+            params->rgrc[0] = mi.rcWork;
+          }
+        }
+        return 0;
+      }
+      break;
+    // 最大化按工作区算，别盖住任务栏（自绘边框后系统算不准）。
+    case WM_GETMINMAXINFO: {
+      auto* info = reinterpret_cast<MINMAXINFO*>(lparam);
+      UINT dpi = ::GetDpiForWindow(hwnd);
+      if (dpi == 0) dpi = 96;
+      info->ptMinTrackSize.x = ::MulDiv(900, dpi, 96);
+      info->ptMinTrackSize.y = ::MulDiv(640, dpi, 96);
+      HMONITOR monitor = ::MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+      MONITORINFO mi{};
+      mi.cbSize = sizeof(mi);
+      if (::GetMonitorInfo(monitor, &mi)) {
+        info->ptMaxPosition.x = mi.rcWork.left - mi.rcMonitor.left;
+        info->ptMaxPosition.y = mi.rcWork.top - mi.rcMonitor.top;
+        info->ptMaxSize.x = mi.rcWork.right - mi.rcWork.left;
+        info->ptMaxSize.y = mi.rcWork.bottom - mi.rcWork.top;
+      }
+      return 0;
+    }
+    // 系统把最大化算到屏幕边界（自绘边框后多出 8px），这里按工作区摆正。
+    case WM_SIZE:
+      if (wparam == SIZE_MAXIMIZED && !maximizing_) {
+        maximizing_ = true;
+        HMONITOR monitor = ::MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+        MONITORINFO mi{};
+        mi.cbSize = sizeof(mi);
+        if (::GetMonitorInfo(monitor, &mi)) {
+          ::SetWindowPos(hwnd, nullptr, mi.rcWork.left, mi.rcWork.top,
+                         mi.rcWork.right - mi.rcWork.left,
+                         mi.rcWork.bottom - mi.rcWork.top,
+                         SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+        }
+        maximizing_ = false;
+      }
+      break;
+    // 自己算拖动区和缩放边：顶部 38dp 是标题栏，右侧按钮区留出来给 Flutter。
+    case WM_NCHITTEST: {
+      POINT pt{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+      RECT wr{};
+      ::GetWindowRect(hwnd, &wr);
+      UINT dpi = ::GetDpiForWindow(hwnd);
+      if (dpi == 0) dpi = 96;
+      const int border = ::MulDiv(6, dpi, 96);
+      const int caption = ::MulDiv(38, dpi, 96);
+      const int buttons = ::MulDiv(150, dpi, 96);
+      const bool left = pt.x < wr.left + border;
+      const bool right = pt.x >= wr.right - border;
+      const bool top = pt.y < wr.top + border;
+      const bool bottom = pt.y >= wr.bottom - border;
+      if (top && left) return HTTOPLEFT;
+      if (top && right) return HTTOPRIGHT;
+      if (bottom && left) return HTBOTTOMLEFT;
+      if (bottom && right) return HTBOTTOMRIGHT;
+      if (left) return HTLEFT;
+      if (right) return HTRIGHT;
+      if (top) return HTTOP;
+      if (bottom) return HTBOTTOM;
+      if (pt.y < wr.top + caption && pt.x < wr.right - buttons) {
+        return HTCAPTION;
+      }
+      break;
+    }
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

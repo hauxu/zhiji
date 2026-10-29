@@ -35,6 +35,9 @@ class FlutterWindow : public Win32Window {
   void UpdateTaskbarProgress(double value, bool show);
 
   // 关闭窗口时是隐藏到托盘还是直接退出（由 Dart 侧设置）。
+  // 最大化校正期间避免重复处理 WM_SIZE。
+  bool maximizing_ = false;
+
   bool minimize_to_tray_ = false;
   bool quit_requested_ = false;
 
