@@ -1,9 +1,12 @@
+# 构建与测试。目前只在手动触发时跑：
+# 这个 GitHub 账户的 Actions 账单没结清，push 触发会直接判失败（job 不会启动）。
+# 账单处理完之后，把下面的 push / pull_request 打开即可。
 name: Build
 
 on:
-  push:
-  pull_request:
   workflow_dispatch:
+  # push:
+  # pull_request:
 
 jobs:
   analyze-test:
