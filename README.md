@@ -11,7 +11,7 @@
 
 ## 下载
 
-<https://www.huaxu.xin/zhiji/>
+<https://www.huaxu.xin/zhiji/>（国内更快；GitHub Release 同样有，见右侧 Releases）
 
 Android 7.0+；Windows 10/11 便携版解压即用，安装版装到用户目录。应用内「检查更新」可升级。
 
