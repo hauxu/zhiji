@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 下载与更新日志
+    url: https://www.huaxu.xin/zhiji/
+    about: 安装包、历史版本和更新说明
+  - name: 安全问题
+    url: https://github.com/hauxu/zhiji/security/advisories/new
+    about: 请不要公开提交安全问题
