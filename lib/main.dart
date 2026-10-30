@@ -325,8 +325,17 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
           wrapped = Stack(
             fit: StackFit.expand,
             children: [
-              // 页面底色压一层很薄的雾面：能看见后面的轮廓，又不影响读字。
-              ColoredBox(color: base.withValues(alpha: 0.35)),
+              // 雾面浓度：清晰 0.9 / 标准 0.62 / 通透 0.34。
+              // 越薄越透，字也越容易跟着背景变灰，所以给用户自己选。
+              ColoredBox(
+                color: base.withValues(
+                  alpha: switch (ui.glassStrength) {
+                    0 => 0.9,
+                    2 => 0.34,
+                    _ => 0.62,
+                  },
+                ),
+              ),
               wrapped,
             ],
           );

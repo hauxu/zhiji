@@ -53,6 +53,12 @@ class UiPrefs extends ChangeNotifier {
   /// 是否启用自定义背景。
   bool bgEnabled = false;
 
+  // Windows 毛玻璃浓度（gd2_glass_strength）：0 清晰 / 1 标准 / 2 通透。
+  static const _kGlassStrength = 'gd2_glass_strength';
+
+  /// 雾面浓度档位，越大越不透明、字越好读。
+  int glassStrength = 1;
+
   Future<void> load() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -66,6 +72,7 @@ class UiPrefs extends ChangeNotifier {
       cbookCollapsedCount = prefs.getInt(_kCBookCollapsed) ?? 10;
       bgPath = prefs.getString(_kBgPath) ?? '';
       bgOpacity = prefs.getDouble(_kBgOpacity) ?? 0.35;
+      glassStrength = (prefs.getInt(_kGlassStrength) ?? 1).clamp(0, 2);
       bgEnabled = prefs.getBool(_kBgEnabled) ?? false;
     } catch (_) {}
     notifyListeners();
@@ -116,6 +123,18 @@ class UiPrefs extends ChangeNotifier {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_kBgPath, v);
+    } catch (_) {}
+  }
+
+  /// 切换毛玻璃浓度（0 清晰 / 1 标准 / 2 通透）。
+  Future<void> setGlassStrength(int v) async {
+    final level = v.clamp(0, 2);
+    if (level == glassStrength) return;
+    glassStrength = level;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_kGlassStrength, level);
     } catch (_) {}
   }
 

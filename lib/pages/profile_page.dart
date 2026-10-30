@@ -1111,6 +1111,7 @@ class _SettingsCard extends StatelessWidget {
             const _CardTitle('Windows'),
             const _LaunchAtStartupTile(),
             const _GlassTile(),
+            const _GlassStrengthTile(),
             const _MinimizeToTrayTile(),
           ],
           const Divider(height: 1, indent: 16, endIndent: 16),
@@ -1306,6 +1307,49 @@ class _GlassTileState extends State<_GlassTile> {
               await WindowsShell.instance.setGlassEnabled(v);
             }
           : null,
+    );
+  }
+}
+
+/// 毛玻璃浓度：清晰 / 标准 / 通透。
+class _GlassStrengthTile extends StatelessWidget {
+  const _GlassStrengthTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final prefs = context.watch<UiPrefs>();
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Row(
+        children: [
+          Icon(
+            Icons.opacity_rounded,
+            size: 20,
+            color: scheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 12),
+          const Text('浓度', style: TextStyle(fontSize: 14)),
+          const Spacer(),
+          SegmentedButton<int>(
+            segments: const [
+              ButtonSegment(value: 0, label: Text('清晰')),
+              ButtonSegment(value: 1, label: Text('标准')),
+              ButtonSegment(value: 2, label: Text('通透')),
+            ],
+            selected: {prefs.glassStrength},
+            showSelectedIcon: false,
+            style: const ButtonStyle(
+              visualDensity: VisualDensity.compact,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onSelectionChanged: (v) {
+              m3HapticSelect();
+              prefs.setGlassStrength(v.first);
+            },
+          ),
+        ],
+      ),
     );
   }
 }
