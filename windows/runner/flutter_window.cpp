@@ -1,5 +1,7 @@
 #include "flutter_window.h"
 
+#include <windowsx.h>
+
 #include <dwmapi.h>
 #include <objidl.h>
 #include <shobjidl_core.h>
@@ -79,6 +81,12 @@ FlutterWindow::~FlutterWindow() {}
 bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
+  }
+  // 按普通窗口排序，别被上次运行或外部工具留成置顶。
+  HWND self = GetHandle();
+  if (self) {
+    ::SetWindowPos(self, HWND_NOTOPMOST, 0, 0, 0, 0,
+                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
   }
 
   RECT frame = GetClientArea();
@@ -257,6 +265,48 @@ void FlutterWindow::HandleWindowMethod(
     return;
   }
 
+  if (method == "minimize") {
+    HWND hwnd = GetHandle();
+    if (hwnd) ::ShowWindow(hwnd, SW_MINIMIZE);
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
+  if (method == "toggleMaximize") {
+    HWND hwnd = GetHandle();
+    if (hwnd) ::ShowWindow(hwnd, ::IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
+  if (method == "closeWindow") {
+    // 走正常 WM_CLOSE：收托盘、通知 Dart 侧都由那条路径负责。
+    HWND hwnd = GetHandle();
+    if (hwnd) ::PostMessage(hwnd, WM_CLOSE, 0, 0);
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
+  if (method == "resetFrame") {
+    // flutter_acrylic 会把 DWM 窗框扩进客户区（系统标题栏会重新出现），
+    // 设完材质再清零，保持自绘标题栏。
+    HWND hwnd = GetHandle();
+    if (hwnd) {
+      MARGINS zero{0, 0, 0, 0};
+      DwmExtendFrameIntoClientArea(hwnd, &zero);
+      ::SetWindowPos(hwnd, nullptr, 0, 0, 0, 0,
+                     SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED);
+      RECT rc{};
+      ::GetClientRect(hwnd, &rc);
+      if (child_content() != nullptr) {
+        ::MoveWindow(child_content(), rc.left, rc.top, rc.right - rc.left,
+                     rc.bottom - rc.top, TRUE);
+      }
+    }
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
   if (method == "hideToTray" || method == "showFromTray") {
     HWND hwnd = GetHandle();
     if (hwnd) {
@@ -310,6 +360,52 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // 自绘边框的消息要在转发给引擎之前处理，否则会被它先消费掉。
+  switch (message) {
+    // 客户区铺满整个窗口：系统标题栏和边框都不要，材质才能连成一片。
+    case WM_NCCALCSIZE:
+      if (wparam == TRUE) {
+        auto* params = reinterpret_cast<NCCALCSIZE_PARAMS*>(lparam);
+        if (::IsZoomed(hwnd)) {
+          HMONITOR monitor = ::MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+          MONITORINFO mi{};
+          mi.cbSize = sizeof(mi);
+          if (::GetMonitorInfo(monitor, &mi)) {
+            params->rgrc[0] = mi.rcWork;
+          }
+        }
+        return 0;
+      }
+      break;
+    // 拖动区和缩放边自己算：顶部 38dp 拖动，右侧 150dp 留给标题栏按钮。
+    case WM_NCHITTEST: {
+      POINT pt{GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+      RECT wr{};
+      ::GetWindowRect(hwnd, &wr);
+      UINT dpi = ::GetDpiForWindow(hwnd);
+      if (dpi == 0) dpi = 96;
+      const int border = ::MulDiv(6, dpi, 96);
+      const int caption = ::MulDiv(38, dpi, 96);
+      const int buttons = ::MulDiv(150, dpi, 96);
+      const bool left = pt.x < wr.left + border;
+      const bool right = pt.x >= wr.right - border;
+      const bool top = pt.y < wr.top + border;
+      const bool bottom = pt.y >= wr.bottom - border;
+      if (top && left) return HTTOPLEFT;
+      if (top && right) return HTTOPRIGHT;
+      if (bottom && left) return HTBOTTOMLEFT;
+      if (bottom && right) return HTBOTTOMRIGHT;
+      if (left) return HTLEFT;
+      if (right) return HTRIGHT;
+      if (top) return HTTOP;
+      if (bottom) return HTBOTTOM;
+      if (pt.y < wr.top + caption && pt.x < wr.right - buttons) {
+        return HTCAPTION;
+      }
+      break;
+    }
+  }
+
   // Give Flutter, including plugins, an opportunity to handle window messages.
   if (flutter_controller_) {
     std::optional<LRESULT> result =

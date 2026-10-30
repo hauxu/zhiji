@@ -60,6 +60,36 @@ class WindowBridge {
     } catch (_) {}
   }
 
+  /// flutter_acrylic 设完材质后调用：把窗框扩展清零，系统标题栏才不会回来。
+  static Future<void> resetFrame() async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<bool>('resetFrame', true);
+    } catch (_) {}
+  }
+
+  static Future<void> minimize() async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<bool>('minimize', true);
+    } catch (_) {}
+  }
+
+  static Future<void> toggleMaximize() async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<bool>('toggleMaximize', true);
+    } catch (_) {}
+  }
+
+  /// 标题栏关闭按钮：走原生 WM_CLOSE，收托盘由那边决定。
+  static Future<void> closeWindow() async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<bool>('closeWindow', true);
+    } catch (_) {}
+  }
+
   static Future<void> hideToTray() async {
     if (!Platform.isWindows) return;
     try {
