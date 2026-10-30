@@ -1,17 +1,17 @@
 # server
 
-之计的同步服务端，只用 Python 标准库。客户端构建方法见根目录 README。
+之计的同步服务端，只用 Python 标准库。客户端构建见根目录 README。
 
 ## 部署
 
 ```sh
-# 证书（换成自己的域名）
+# 证书
 sudo mkdir -p /opt/goalday-sync/certs
 openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
   -keyout /opt/goalday-sync/certs/sync.key \
   -out /opt/goalday-sync/certs/sync.crt -subj "/CN=your.server.com"
 
-# 专用账号，不放 root 跑
+# 专用账号
 sudo useradd --system --no-create-home --shell /usr/sbin/nologin goalday
 sudo mkdir -p /var/lib/goalday-sync/data
 sudo chown -R goalday:goalday /var/lib/goalday-sync
@@ -19,10 +19,11 @@ sudo chown -R root:goalday /opt/goalday-sync/certs
 sudo chmod 750 /opt/goalday-sync/certs
 sudo chmod 640 /opt/goalday-sync/certs/*
 
-# 环境变量写进 /etc/goalday-sync/env，systemd 示例见 goalday-sync.service
-# 示例假定代码在 /opt/goalday-sync，按实际路径改 ExecStart
+# 环境变量写进 /etc/goalday-sync/env
 sudo -E python3 server/server.py
 ```
+
+数据在 `GD_DATA_DIR`，数据目录只能跑一个实例，systemd 示例见 `goalday-sync.service`（假定代码在 `/opt/goalday-sync`）。备份用 `ops_daily_backup.sh`，`ops_restore_drill.py` 校验备份包。
 
 ## 环境变量
 
@@ -40,13 +41,6 @@ sudo -E python3 server/server.py
 | `GD_MSG_CAP` / `GD_COMMENT_CAP` | `30` / `30` | 每 IP 每分钟留言 / 评价上限 |
 | `GD_ROOM_MESSAGE_BYTES` / `GD_ROOM_COMMENT_BYTES` | `24MB` / `12MB` | 单房间历史总大小上限 |
 
-## 数据与备份
-
-数据都在 `GD_DATA_DIR`：`accounts.json`、`rooms.json`、`data/`。建议每天打包这三样。`ops_daily_backup.sh` 是备份脚本，`ops_restore_drill.py` 校验备份包。
-
-同一数据目录只能跑一个实例（启动时加独占锁，第二个进程会退出）。`goalday-sync.service` 用专用账号运行，开启 `ProtectSystem=strict` 并清空 capabilities。
-
 ## 许可
 
 AGPL-3.0，全文见 [LICENSE](LICENSE)。客户端是 GPL-3.0；把改过的服务端部署成对外服务时，也要公开改过的源码。
-

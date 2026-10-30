@@ -3,7 +3,7 @@
 
 #define MyAppName "之计"
 #define MyAppNameEn "Judging"
-#define MyAppVersion "5.16.23"
+#define MyAppVersion "5.16.26"
 #define MyAppExeName "zhiji.exe"
 #define MyAppId "{{8E4F5C2A-9B71-4D3E-A0C6-5A1B2C3D4E5F}"
 

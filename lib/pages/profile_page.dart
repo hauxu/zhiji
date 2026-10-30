@@ -412,7 +412,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '一日之计：清单、周计划、日记与习惯。\n'
+                    '一日之计：清单、计划、日子与习惯。\n'
                     '本地存储，登录后云备份，可绑定情侣',
                     style: TextStyle(
                       fontSize: 12,
@@ -518,36 +518,37 @@ class _AccountCardState extends State<_AccountCard> {
   }
 
   Future<void> _pickAvatar() async {
-    final picker = ImagePicker();
-    final picked = await picker.pickImage(
-      source: ImageSource.gallery,
-      maxWidth: 256,
-      maxHeight: 256,
-    );
-    if (picked == null || !mounted) return;
-    final sync = context.read<SyncService>();
-    final dir = await getApplicationDocumentsDirectory();
-    final oldPath = _avatarPath;
-    final savePath =
-        '${dir.path}/avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
     try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 256,
+        maxHeight: 256,
+      );
+      if (picked == null || !mounted) return;
+      final sync = context.read<SyncService>();
+      final dir = await getApplicationDocumentsDirectory();
+      if (!mounted) return;
+      final oldPath = _avatarPath;
+      final savePath =
+          '${dir.path}/avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
       await File(picked.path).copy(savePath);
+      if (!mounted) return;
+      // 清理上一张头像文件。
+      if (oldPath != null &&
+          oldPath != savePath &&
+          oldPath != sync.avatarPath &&
+          File(oldPath).existsSync()) {
+        try {
+          await File(oldPath).delete();
+        } catch (_) {}
+      }
+      if (!mounted) return;
+      setState(() => _avatarPath = savePath);
+      await sync.setAvatarPath(savePath);
     } catch (_) {
-      showTopToast('头像保存失败，请重试');
-      return;
+      if (mounted) showTopToast('头像保存失败，请重试');
     }
-    // 清理上一张头像文件。
-    if (oldPath != null &&
-        oldPath != savePath &&
-        oldPath != sync.avatarPath &&
-        File(oldPath).existsSync()) {
-      try {
-        await File(oldPath).delete();
-      } catch (_) {}
-    }
-    if (!mounted) return;
-    _avatarPath = savePath;
-    await sync.setAvatarPath(savePath);
   }
 
   Future<void> _editNickname() async {
@@ -1520,7 +1521,7 @@ class _AiSettingsSheetState extends State<_AiSettingsSheet> {
               ),
               const SizedBox(height: 4),
               Text(
-                '新建任务时点 ✨，由下面配置的接口识别输入',
+                '新建计划时点 ✨，由下面配置的接口识别输入',
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.5,
@@ -2054,22 +2055,21 @@ void showThemeColorPicker(BuildContext context) {
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   dense: true,
-                  title: const Text('跟随系统取色',
-                      style: TextStyle(fontSize: 14)),
-                subtitle: Text(
-                  themeStore.useDynamic ? '使用系统壁纸色' : '使用传统色',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: scheme.onSurfaceVariant,
+                  title: const Text('跟随系统取色', style: TextStyle(fontSize: 14)),
+                  subtitle: Text(
+                    themeStore.useDynamic ? '使用系统壁纸色' : '使用传统色',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
+                  value: themeStore.useDynamic,
+                  onChanged: (v) {
+                    m3HapticSelect();
+                    themeStore.setUseDynamic(v);
+                    Navigator.of(sheetContext).pop();
+                  },
                 ),
-                value: themeStore.useDynamic,
-                onChanged: (v) {
-                  m3HapticSelect();
-                  themeStore.setUseDynamic(v);
-                  Navigator.of(sheetContext).pop();
-                },
-              ),
               const SizedBox(height: 6),
               Text(
                 '选择传统色',

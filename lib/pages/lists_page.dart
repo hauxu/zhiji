@@ -113,10 +113,13 @@ class _ListsPageState extends State<ListsPage> {
 
   void _showQuickAddSheet() {
     final store = context.read<AppStore>();
-    // 未选清单时进未分类集合。
-    final initial = _selectedListId == null
-        ? store.ensureUnfiled()
-        : store.listById(_selectedListId!);
+    final selectedId = _selectedListId;
+    var initial = selectedId == null ? null : store.listById(selectedId);
+    if (initial == null && selectedId != null) {
+      // 选中的清单可能已被同步删除，清掉悬空选中。
+      setState(() => _selectedListId = null);
+    }
+    initial ??= store.ensureUnfiled();
     showM3Sheet<void>(
       context: context,
       isScrollControlled: true,
@@ -330,6 +333,7 @@ class _ListsPageState extends State<ListsPage> {
                               child: selected == null
                                   ? _AllListsView(
                                       key: const ValueKey('lists-all'),
+                                      selectedListId: _selectedListId,
                                       onOpenList: (id) =>
                                           setState(() => _selectedListId = id),
                                     )
@@ -383,7 +387,13 @@ class _DesktopListsBody extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     return Row(
       children: [
-        SizedBox(width: 340, child: _AllListsView(onOpenList: onOpenList)),
+        SizedBox(
+          width: 340,
+          child: _AllListsView(
+            selectedListId: selected?.id,
+            onOpenList: onOpenList,
+          ),
+        ),
         const VerticalDivider(width: 1),
         Expanded(
           child: selected == null
@@ -673,9 +683,14 @@ class _ListTrashSheetState extends State<_ListTrashSheet> {
 
 /// 全部视图：平铺未分类 + 按清单分组
 class _AllListsView extends StatefulWidget {
-  const _AllListsView({super.key, required this.onOpenList});
+  const _AllListsView({
+    super.key,
+    required this.onOpenList,
+    this.selectedListId,
+  });
 
   final void Function(String listId) onOpenList;
+  final String? selectedListId;
 
   @override
   State<_AllListsView> createState() => _AllListsViewState();
@@ -735,6 +750,9 @@ class _AllListsViewState extends State<_AllListsView> {
       children: [
         if (unfiled.isNotEmpty) ...[
           Card(
+            color: widget.selectedListId == AppStore.unfiledListId
+                ? scheme.secondaryContainer.withValues(alpha: 0.5)
+                : null,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -824,6 +842,9 @@ class _AllListsViewState extends State<_AllListsView> {
         ],
         for (final entry in groups.entries) ...[
           Card(
+            color: widget.selectedListId == entry.key.id
+                ? scheme.secondaryContainer.withValues(alpha: 0.5)
+                : null,
             child: Column(
               children: [
                 InkWell(
@@ -2512,8 +2533,25 @@ class _QuickAddSheet extends StatefulWidget {
 
 class _QuickAddSheetState extends State<_QuickAddSheet> {
   late final TextEditingController _ctrl = TextEditingController();
-  late TaskList? _target = widget.initialTarget;
-  late final List<TaskList> _allLists = _listChoices();
+  String? _targetId;
+
+  @override
+  void initState() {
+    super.initState();
+    _targetId = widget.initialTarget?.id;
+    widget.store.addListener(_onStoreChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.store.removeListener(_onStoreChanged);
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  void _onStoreChanged() {
+    if (mounted) setState(() {});
+  }
 
   List<TaskList> _listChoices() {
     final unfiled = widget.store.unfiled;
@@ -2523,24 +2561,32 @@ class _QuickAddSheetState extends State<_QuickAddSheet> {
     ];
   }
 
-  void _submit() {
-    final v = _ctrl.text.trim();
-    if (v.isEmpty || _target == null) return;
-    m3HapticSelect();
-    widget.store.addListItem(_target!.id, v);
-    Navigator.of(context).pop();
+  /// 优先用当前选择，选择已被删除时落到第一个可用清单。
+  TaskList? _resolveTarget(List<TaskList> choices) {
+    final targetId = _targetId;
+    if (targetId != null) {
+      for (final l in choices) {
+        if (l.id == targetId) return l;
+      }
+    }
+    return choices.isEmpty ? null : choices.first;
   }
 
-  @override
-  void dispose() {
-    _ctrl.dispose();
-    super.dispose();
+  void _submit(TaskList target) {
+    final v = _ctrl.text.trim();
+    if (v.isEmpty) return;
+    m3HapticSelect();
+    widget.store.addListItem(target.id, v);
+    Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final targetName = _target?.name ?? AppStore.unfiledListName;
+    final choices = _listChoices();
+    final target = _resolveTarget(choices);
+    final targetName = target?.name ?? '选择清单';
+    final canSave = target != null && _ctrl.text.trim().isNotEmpty;
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       child: Padding(
@@ -2558,7 +2604,9 @@ class _QuickAddSheetState extends State<_QuickAddSheet> {
               controller: _ctrl,
               autofocus: true,
               textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _submit(),
+              onSubmitted: (_) {
+                if (target != null) _submit(target);
+              },
               onChanged: (_) => setState(() {}),
               decoration: InputDecoration(
                 hintText: '想做的事，回车保存',
@@ -2569,10 +2617,10 @@ class _QuickAddSheetState extends State<_QuickAddSheet> {
                   ),
                   onSelected: (l) {
                     m3HapticSelect();
-                    setState(() => _target = l);
+                    setState(() => _targetId = l.id);
                   },
                   itemBuilder: (context) => [
-                    for (final l in _allLists)
+                    for (final l in choices)
                       PopupMenuItem(
                         value: l,
                         child: Row(
@@ -2590,10 +2638,10 @@ class _QuickAddSheetState extends State<_QuickAddSheet> {
                               l.name,
                               style: TextStyle(
                                 fontSize: 13.5,
-                                color: _target?.id == l.id
+                                color: target?.id == l.id
                                     ? scheme.primary
                                     : scheme.onSurface,
-                                fontWeight: _target?.id == l.id
+                                fontWeight: target?.id == l.id
                                     ? FontWeight.w600
                                     : FontWeight.normal,
                               ),
@@ -2606,7 +2654,7 @@ class _QuickAddSheetState extends State<_QuickAddSheet> {
                 ),
                 suffixIcon: IconButton(
                   tooltip: '保存',
-                  onPressed: _ctrl.text.trim().isEmpty ? null : _submit,
+                  onPressed: canSave ? () => _submit(target) : null,
                   icon: Icon(
                     Icons.check_rounded,
                     size: 20,
@@ -2617,7 +2665,7 @@ class _QuickAddSheetState extends State<_QuickAddSheet> {
             ),
             const SizedBox(height: 6),
             Text(
-              '点左侧 + 可切换清单',
+              target == null ? '没有可用清单，请先新建清单' : '点左侧 + 可切换清单',
               style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
             ),
           ],

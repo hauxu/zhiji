@@ -103,9 +103,8 @@ class _TaskEditSheetState extends State<_TaskEditSheet> {
       firstDate: today().subtract(const Duration(days: 365)),
       lastDate: today().add(const Duration(days: 365 * 2)),
     );
-    if (picked != null) {
-      setState(() => _date = dateKey(picked));
-    }
+    if (picked == null || !mounted) return;
+    setState(() => _date = dateKey(picked));
   }
 
   Future<void> _pickTime({required bool isStart}) async {
@@ -121,7 +120,7 @@ class _TaskEditSheetState extends State<_TaskEditSheet> {
       }
     }
     final picked = await showTimePicker(context: context, initialTime: initial);
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     final value =
         '${picked.hour.toString().padLeft(2, '0')}:${picked.minute.toString().padLeft(2, '0')}';
     setState(() {
@@ -219,8 +218,10 @@ class _TaskEditSheetState extends State<_TaskEditSheet> {
   void _save() {
     final title = _title.text.trim();
     if (title.isEmpty || _weeklyInvalid || _timeInvalid) return;
-    // 清空结束时间会一并关闭提醒，明确告知。
-    if (_end.isEmpty && _remind > 0) {}
+    // 清空结束时间会一并关闭提醒，保存时明确告知。
+    if (_end.isEmpty && _remind > 0) {
+      showTopToast('结束时间已清空，提醒已关闭');
+    }
     final store = context.read<AppStore>();
     // 重复任务的锚点：无日期时以今天为起点。
     final anchor = (_isRecurring && _date.isEmpty) ? dateKey(today()) : _date;
@@ -260,8 +261,8 @@ class _TaskEditSheetState extends State<_TaskEditSheet> {
     final confirmed = await showM3Dialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('删除这个任务？'),
-        content: Text(task.isRecurring ? '重复任务的全部记录都会被删除' : '删除后无法恢复'),
+        title: const Text('删除这个计划？'),
+        content: Text(task.isRecurring ? '重复计划的全部记录都会被删除' : '删除后无法恢复'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -358,7 +359,7 @@ class _TaskEditSheetState extends State<_TaskEditSheet> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _isEdit ? '编辑任务' : '新任务',
+                      _isEdit ? '编辑计划' : '新任务',
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
@@ -369,7 +370,7 @@ class _TaskEditSheetState extends State<_TaskEditSheet> {
                       autofocus: !_isEdit,
                       controller: _title,
                       decoration: InputDecoration(
-                        labelText: '任务',
+                        labelText: '计划',
                         suffixIcon: !_aiAvailable
                             ? null
                             : _recognizing

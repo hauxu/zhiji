@@ -14,7 +14,7 @@ import '../widgets/milestone_book.dart';
 import '../widgets/milestone_edit_sheet.dart';
 
 /// 倒数本子页面：完整列表（含未外显条目），已过去分组默认折叠。
-/// [source] 决定读写哪套界面设置：日子页与情侣「纪念日」各控制各的。
+/// [source] 决定读写哪套界面设置：日子页与情侣倒数本各控制各的。
 enum MilestoneBookSource { journal, couple }
 
 class MilestoneBookPage extends StatefulWidget {
@@ -55,14 +55,14 @@ class _MilestoneBookPageState extends State<MilestoneBookPage> {
     final past = merged.where((r) => !r.$1.pinned && r.$1.isPast(now)).toList();
 
     final title = couple
-        ? (sync.coupleBookName.isEmpty ? '纪念日' : sync.coupleBookName)
+        ? (sync.coupleBookName.isEmpty ? '倒数本' : sync.coupleBookName)
         : '倒数本';
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
         actions: [
           IconButton(
-            tooltip: couple ? '纪念日设置' : '倒数本设置',
+            tooltip: '倒数本设置',
             onPressed: () => showBookSettingsSheet(
               context,
               couple: couple,
@@ -80,7 +80,7 @@ class _MilestoneBookPageState extends State<MilestoneBookPage> {
         child: merged.isEmpty
             ? Center(
                 child: Text(
-                  '记下生日、纪念日和重要的日子，一起倒数',
+                  '记下重要的日子，一起倒数',
                   style: TextStyle(
                     fontSize: 13,
                     color: scheme.onSurfaceVariant,

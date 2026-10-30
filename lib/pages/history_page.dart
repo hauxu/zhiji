@@ -21,7 +21,7 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  /// 桌面双栏当前选中的日期键；'week' 表示本周任务分组。
+  /// 桌面双栏当前选中的日期键；'week' 表示本周计划分组。
   String? _selectedKey;
 
   @override
@@ -49,13 +49,30 @@ class _HistoryPageState extends State<HistoryPage> {
       months.putIfAbsent('${d.year}-${d.month}', () => []).add(d);
     }
     final isEmpty = dayData.isEmpty && weekScoped.isEmpty;
+    if (isEmpty && _selectedKey != null && context.isExpanded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _selectedKey != null) {
+          setState(() => _selectedKey = null);
+        }
+      });
+    }
 
     if (context.isExpanded && !isEmpty) {
-      final selectedKey =
-          _selectedKey ??
-          (sortedDays.isNotEmpty
-              ? dateKey(sortedDays.first)
-              : (weekScoped.isNotEmpty ? 'week' : null));
+      final fallbackKey = sortedDays.isNotEmpty
+          ? dateKey(sortedDays.first)
+          : (weekScoped.isNotEmpty ? 'week' : null);
+      final selectedValid = _selectedKey == 'week'
+          ? weekScoped.isNotEmpty
+          : _selectedKey != null &&
+                sortedDays.any((d) => dateKey(d) == _selectedKey);
+      var selectedKey = selectedValid ? _selectedKey : fallbackKey;
+      if (selectedKey != _selectedKey) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _selectedKey != selectedKey) {
+            setState(() => _selectedKey = selectedKey);
+          }
+        });
+      }
       DateTime? selectedDay;
       for (final d in sortedDays) {
         if (dateKey(d) == selectedKey) {
@@ -82,7 +99,7 @@ class _HistoryPageState extends State<HistoryPage> {
               child: SlidableAutoCloseBehavior(
                 child: selectedKey == 'week'
                     ? _HistoryDayPane(
-                        title: '本周任务',
+                        title: '本周计划',
                         subtitle: '${weekScoped.length} 项',
                         tasks: weekScoped,
                         day: base,
@@ -113,7 +130,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
                   children: [
                     if (weekScoped.isNotEmpty) ...[
-                      const _MonthLabel('本周任务'),
+                      const _MonthLabel('本周计划'),
                       Card(
                         child: Column(
                           children: [
@@ -175,7 +192,7 @@ class _DesktopHistoryList extends StatelessWidget {
                     ? scheme.primary
                     : scheme.onSurfaceVariant,
               ),
-              title: const Text('本周任务', style: TextStyle(fontSize: 14)),
+              title: const Text('本周计划', style: TextStyle(fontSize: 14)),
               subtitle: Text(
                 '${weekScoped.length} 项',
                 style: const TextStyle(fontSize: 11),
@@ -295,7 +312,7 @@ class _HistoryEmpty extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              '完成的任务按日期保存',
+              '完成的计划按日期保存',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
             ),

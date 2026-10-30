@@ -164,7 +164,7 @@ Future<void> showEvaluateSheet(
   required String targetId,
   required String targetKind,
   required String title,
-  String kindLabel = '任务',
+  String kindLabel = '计划',
 }) {
   return showM3Sheet<void>(
     context: context,
@@ -462,7 +462,7 @@ Future<void> showPartnerTaskSheet(
               );
             },
             icon: const Icon(Icons.favorite_rounded, size: 18),
-            label: const Text('评价这个任务'),
+            label: const Text('评价这个计划'),
           ),
         ],
       ),

@@ -7,7 +7,7 @@ import '../sync/sync_service.dart';
 import '../util/dates.dart';
 import 'm3_dialog.dart';
 
-/// 找回旧任务：只列没做完但已过期的计划，选中后复制到今天。
+/// 找回旧计划：只列没做完但已过期的计划，选中后复制到今天。
 /// 做完的过去计划去「历史计划」页左滑找回，这里不再出现。
 Future<void> showFindOldTaskSheet(BuildContext context) async {
   await showM3Sheet<void>(
@@ -99,7 +99,7 @@ class _FindOldTaskSheetState extends State<_FindOldTaskSheet> {
           const Padding(
             padding: EdgeInsets.fromLTRB(20, 14, 20, 4),
             child: Text(
-              '找回旧任务',
+              '找回旧计划',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),

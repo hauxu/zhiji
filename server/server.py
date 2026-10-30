@@ -455,26 +455,30 @@ def _rotate_bak(target):
         print("bak rotate failed:", target.name, exc, flush=True)
 
 
+def _write_atomic(target, payload):
+    """写临时文件、刷盘、再替换；断电时最多丢这一次写入，不会留半截 JSON。"""
+    tmp = target.with_suffix(target.suffix + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as fp:
+        fp.write(payload)
+        fp.flush()
+        os.fsync(fp.fileno())
+    _rotate_bak(target)
+    tmp.replace(target)
+
+
 def save_accounts():
-    tmp = DATA_DIR / "accounts.json.tmp"
-    tmp.write_text(json.dumps(_accounts, ensure_ascii=False), encoding="utf-8")
-    _rotate_bak(DATA_DIR / "accounts.json")
-    tmp.replace(DATA_DIR / "accounts.json")
+    _write_atomic(DATA_DIR / "accounts.json",
+                  json.dumps(_accounts, ensure_ascii=False))
 
 
 def save_rooms():
-    tmp = DATA_DIR / "rooms.json.tmp"
-    tmp.write_text(json.dumps(list(_rooms.values()), ensure_ascii=False), encoding="utf-8")
-    _rotate_bak(DATA_DIR / "rooms.json")
-    tmp.replace(DATA_DIR / "rooms.json")
+    _write_atomic(DATA_DIR / "rooms.json",
+                  json.dumps(list(_rooms.values()), ensure_ascii=False))
 
 
 def save_snapshot(aid):
     f = DATA_DIR / "data" / f"{aid}.json"
-    tmp = f.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(_snapshots.get(aid, {}), ensure_ascii=False), encoding="utf-8")
-    _rotate_bak(f)
-    tmp.replace(f)
+    _write_atomic(f, json.dumps(_snapshots.get(aid, {}), ensure_ascii=False))
 
 
 SWEEP_INTERVAL_S = 30
@@ -707,6 +711,8 @@ def api_login(p, ip):
     # 限流在 do_POST 里、PBKDF2 之前统一做（见 Handler.do_POST）。
     email = str(p.get("username", "")).strip().lower()
     password = str(p.get("password", ""))
+    if len(password) > 1024 or len(email) > 254:
+        raise ApiError("参数错误")
     device = str(p.get("device") or "")[:64]
     rec = _accounts.get(email)
     prepared = p.get("_prepared")  # (salt, iters, dk_hex) 锁外已算
@@ -1725,6 +1731,8 @@ def api_check_update(p, ip):
         fname = str(manifest.get("fileWindows") or "")
     else:
         fname = str(manifest.get("file", ""))
+    # 只认本目录下的文件名，挡住 ../ 这种写法。
+    fname = os.path.basename(fname)
     if not fname or not (fname.endswith(".apk") or fname.endswith(".zip")):
         return {"update": False}
     f = APK_DIR / fname
@@ -1760,11 +1768,9 @@ def api_list_devices(p, ip):
     """本账号登录过的设备列表（设备管理 UI 用）。只回自己账号的槽。"""
     aid = auth_account(p)
     token = str(p.get("token", ""))
-    requested = str(p.get("device", ""))[:64]
+    # current 只认服务端会话记录；没有记录就不标当前设备，
+    # 免得请求里随便传个 device 就成了"当前设备"、绕开删除保护。
     current = _token_devices.get(token, "")
-    if not current and requested:
-        current = requested
-        _remember_token_device(aid, token, requested)
     devices = _slot_devices(aid)
     rows = []
     for dev, info in devices.items():
@@ -1988,6 +1994,10 @@ class Handler(BaseHTTPRequestHandler):
                 self._reply({"error": "unauthorized"}, 401)
                 return
             action = payload.get("action")
+            # action 必须是字符串：list/dict 会让字典查找抛 TypeError 变成 500。
+            if not isinstance(action, str) or not action:
+                self._reply({"error": "unknown action"}, 400)
+                return
             fn = ACTIONS.get(action)
             if fn is None:
                 self._reply({"error": "unknown action"}, 400)

@@ -138,21 +138,35 @@ class _ToastCardState extends State<_ToastCard>
                       ),
                     ),
                     if (widget.actionLabel != null) ...[
-                      const SizedBox(width: 12),
-                      GestureDetector(
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () {
-                          TopToast.hide();
-                          widget.onAction?.call();
-                        },
-                        child: Padding(
-                          padding: const EdgeInsets.only(left: 4),
-                          child: Text(
-                            widget.actionLabel!,
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w600,
-                              color: scheme.inversePrimary,
+                      const SizedBox(width: 4),
+                      Semantics(
+                        button: true,
+                        label: widget.actionLabel,
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              TopToast.hide();
+                              widget.onAction?.call();
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  widget.actionLabel!,
+                                  style: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: scheme.inversePrimary,
+                                  ),
+                                ),
+                              ),
                             ),
                           ),
                         ),

@@ -361,32 +361,39 @@ class _AccountViewState extends State<_AccountView> {
     }
     setState(() => _submitting = true);
     final sync = context.read<SyncService>();
-    await Notify.instance.requestPermission();
-    final nickname = _nicknameCtrl.text.trim();
-    if (_register) {
-      await sync.register(
-        _emailCtrl.text.trim(),
-        _passwordCtrl.text,
-        code: _codeCtrl.text.trim(),
-        nickname: nickname,
-      );
-    } else {
-      await sync.login(_emailCtrl.text.trim(), _passwordCtrl.text);
-    }
-    if (!mounted) return;
-    setState(() => _submitting = false);
-    if (sync.loggedIn) {
-      showTopToast('已登录');
-      // 首次注册：引导生成并下载保存备份恢复码。
-      if (_register && !sync.hasRecoveryCodes && mounted) {
-        // 注册成功后父级会立刻切走本视图，改用根导航器延后弹，不依赖本组件存活。
-        final nav = Navigator.of(context);
-        Future<void>.delayed(const Duration(milliseconds: 300), () {
-          if (nav.mounted) showRecoverySetupFlow(nav.context);
-        });
+    try {
+      await Notify.instance.requestPermission();
+      final nickname = _nicknameCtrl.text.trim();
+      if (_register) {
+        await sync.register(
+          _emailCtrl.text.trim(),
+          _passwordCtrl.text,
+          code: _codeCtrl.text.trim(),
+          nickname: nickname,
+        );
+      } else {
+        await sync.login(_emailCtrl.text.trim(), _passwordCtrl.text);
       }
-    } else {
-      setState(() {});
+      if (!mounted) return;
+      if (sync.loggedIn) {
+        showTopToast('已登录');
+        // 首次注册：引导生成并下载保存备份恢复码。
+        if (_register && !sync.hasRecoveryCodes && mounted) {
+          // 注册成功后父级会立刻切走本视图，改用根导航器延后弹，不依赖本组件存活。
+          final nav = Navigator.of(context);
+          Future<void>.delayed(const Duration(milliseconds: 300), () {
+            if (nav.mounted) showRecoverySetupFlow(nav.context);
+          });
+        }
+      } else {
+        setState(() {});
+      }
+    } catch (_) {
+      if (mounted) {
+        showTopToast(sync.lastError ?? '登录失败，请稍后重试');
+      }
+    } finally {
+      if (mounted) setState(() => _submitting = false);
     }
   }
 
@@ -1226,7 +1233,7 @@ class _OverviewTab extends StatelessWidget {
         what = '习惯「${h?.name ?? '已删除'}」';
       default:
         final t = store.taskById(c.targetId);
-        what = '任务「${t?.title ?? '已删除'}」';
+        what = '计划「${t?.title ?? '已删除'}」';
     }
     if (c.kind == 'emoji') {
       return '${couple.partnerName} ${reactionLabel(c.emoji)}了你的$what';
@@ -2184,7 +2191,7 @@ class _MessageBoardState extends State<_MessageBoard> {
             ListTile(
               leading: const Icon(Icons.today_rounded, size: 20),
               title: const Text('计划', style: TextStyle(fontSize: 14)),
-              subtitle: const Text('加为今天的任务', style: TextStyle(fontSize: 11)),
+              subtitle: const Text('加为今天的计划', style: TextStyle(fontSize: 11)),
               onTap: () => Navigator.pop(ctx, 'plan'),
             ),
             ListTile(
@@ -2219,7 +2226,7 @@ class _MessageBoardState extends State<_MessageBoard> {
     switch (target) {
       case 'plan':
         store.addTask(title: title, date: dateKey(today()));
-        showTopToast('已添加为今天的任务');
+        showTopToast('已添加为今天的计划');
       case 'habit':
         store.addHabit(title, habitColors.first);
         showTopToast('已创建习惯「$title」');
@@ -2324,7 +2331,7 @@ class _MessageBoardState extends State<_MessageBoard> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      '对方身份密钥已变化，请核对顶部安全码；不一致请解绑重配',
+                      'TA 的身份密钥已变化，请核对顶部安全码；不一致请解绑重配',
                       style: TextStyle(
                         fontSize: 11,
                         color: scheme.onErrorContainer,
@@ -3163,7 +3170,7 @@ class _PairFingerprintLine extends StatelessWidget {
                   await sync.confirmPairFingerprint();
                   if (context.mounted) showTopToast('已核对');
                 },
-                child: const Text('和对方一致', style: TextStyle(fontSize: 11)),
+                child: const Text('和 TA 一致', style: TextStyle(fontSize: 11)),
               ),
           ],
         ),

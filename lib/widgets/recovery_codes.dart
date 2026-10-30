@@ -224,6 +224,7 @@ Future<void> showRecoverySetupFlow(BuildContext context) async {
 
   // 生成：PBKDF2 派生 + 旧数据迁移推送，可能需要数秒。
   if (!context.mounted) return;
+  final rootNavigator = Navigator.of(context, rootNavigator: true);
   showDialog<void>(
     context: context,
     barrierDismissible: false,
@@ -240,8 +241,8 @@ Future<void> showRecoverySetupFlow(BuildContext context) async {
     error = e;
   } finally {
     // 进度框必须关掉，否则界面卡在不可返回的弹窗上。
-    if (context.mounted) {
-      Navigator.of(context, rootNavigator: true).pop();
+    if (rootNavigator.mounted && rootNavigator.canPop()) {
+      rootNavigator.pop();
     }
   }
   if (!context.mounted) return;

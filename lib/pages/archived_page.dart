@@ -8,6 +8,7 @@ import '../ui/breakpoints.dart';
 import '../util/dates.dart';
 import '../widgets/m3_dialog.dart';
 import '../widgets/responsive.dart';
+import '../widgets/top_toast.dart' show showTopToast;
 
 /// 归档：任务归档（右滑归档的任务）与消息归档（收藏的留言）两个分栏。
 /// 桌面 expanded 下每个分栏都是左列表右详情。
@@ -261,6 +262,14 @@ class _MessageArchiveTab extends StatefulWidget {
 class _MessageArchiveTabState extends State<_MessageArchiveTab> {
   String? _selectedId;
 
+  Future<void> _unarchive(String messageId) async {
+    try {
+      await context.read<SyncService>().unarchiveMessage(messageId);
+    } catch (_) {
+      if (mounted) showTopToast('取消归档失败，请稍后再试');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final sync = context.watch<SyncService>();
@@ -270,7 +279,7 @@ class _MessageArchiveTabState extends State<_MessageArchiveTab> {
       return const ResponsiveContent(
         child: _ArchivedEmpty(
           icon: Icons.bookmark_border_rounded,
-          title: '没有收藏的留言',
+          title: '没有归档的留言',
           subtitle: '长按留言板消息归档',
         ),
       );
@@ -344,11 +353,7 @@ class _MessageArchiveTabState extends State<_MessageArchiveTab> {
                         ),
                         const SizedBox(height: 20),
                         FilledButton.tonalIcon(
-                          onPressed: () async {
-                            await context.read<SyncService>().unarchiveMessage(
-                              '${selected['id']}',
-                            );
-                          },
+                          onPressed: () => _unarchive('${selected['id']}'),
                           icon: const Icon(
                             Icons.bookmark_remove_rounded,
                             size: 18,
@@ -399,11 +404,7 @@ class _MessageArchiveTabState extends State<_MessageArchiveTab> {
                     IconButton(
                       tooltip: '取消归档',
                       icon: const Icon(Icons.bookmark_remove_rounded, size: 20),
-                      onPressed: () async {
-                        await context.read<SyncService>().unarchiveMessage(
-                          '${m['id']}',
-                        );
-                      },
+                      onPressed: () => _unarchive('${m['id']}'),
                     ),
                   ],
                 ),
@@ -412,7 +413,7 @@ class _MessageArchiveTabState extends State<_MessageArchiveTab> {
           Padding(
             padding: const EdgeInsets.only(top: 6),
             child: Text(
-              '收藏只存本机，对方撤回不影响',
+              '归档只存本机，TA 撤回不影响',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
             ),

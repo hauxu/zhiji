@@ -142,7 +142,7 @@ class _PlanPageState extends State<PlanPage> with WidgetsBindingObserver {
         children: [
           FloatingActionButton(
             heroTag: 'findOldTask',
-            tooltip: '找回旧任务',
+            tooltip: '找回旧计划',
             onPressed: () => showFindOldTaskSheet(context),
             child: const Icon(Icons.history_rounded),
           ),
@@ -374,7 +374,7 @@ class _FilterDropdown extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final partnerLabel = couple.isBound && couple.partnerName.isNotEmpty
         ? couple.partnerName
-        : '对方';
+        : 'TA';
     final label = switch (filter) {
       PlanFilter.all => '全部',
       PlanFilter.mine => '我的',
@@ -404,7 +404,7 @@ class _FilterDropdown extends StatelessWidget {
                   switch (f) {
                     PlanFilter.all => '全部',
                     PlanFilter.mine => '我的',
-                    PlanFilter.ta => '对方（$partnerLabel）',
+                    PlanFilter.ta => 'TA（$partnerLabel）',
                   },
                   style: TextStyle(
                     fontSize: 13,
@@ -798,13 +798,19 @@ class _Arrows extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    Widget btn(IconData icon, bool enabled, VoidCallback onTap) => SizedBox(
-      width: 30,
-      height: 30,
+    Widget btn(
+      IconData icon,
+      String tooltip,
+      bool enabled,
+      VoidCallback onTap,
+    ) => SizedBox(
+      width: 40,
+      height: 40,
       child: IconButton(
+        tooltip: tooltip,
         padding: EdgeInsets.zero,
         visualDensity: VisualDensity.compact,
-        icon: Icon(icon, size: 17),
+        icon: Icon(icon, size: 20),
         color: enabled ? scheme.onSurfaceVariant : scheme.outline,
         onPressed: enabled ? onTap : null,
       ),
@@ -812,8 +818,8 @@ class _Arrows extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        btn(Icons.keyboard_arrow_up_rounded, upEnabled, onUp),
-        btn(Icons.keyboard_arrow_down_rounded, downEnabled, onDown),
+        btn(Icons.keyboard_arrow_up_rounded, '上移', upEnabled, onUp),
+        btn(Icons.keyboard_arrow_down_rounded, '下移', downEnabled, onDown),
       ],
     );
   }
@@ -886,15 +892,15 @@ class _WeekBodyState extends State<_WeekBody> {
               if (filterRow != null) ...[filterRow, const SizedBox(height: 10)],
               if (showMine)
                 _TaskRowsSection(
-                  title: '本周任务',
+                  title: '本周计划',
                   headerTrailing: Text(
-                    '不设日期的任务都在这里完成',
+                    '不设日期的计划都在这里完成',
                     style: TextStyle(
                       fontSize: 11,
                       color: scheme.onSurfaceVariant,
                     ),
                   ),
-                  emptyHint: '不设日期的任务会显示在这里',
+                  emptyHint: '不设日期的计划会显示在这里',
                   tasks: store.weekTasks(),
                   scope: 'week',
                   anchor: widget.weekStart,

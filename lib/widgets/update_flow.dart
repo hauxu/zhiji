@@ -157,8 +157,12 @@ Future<void> installReadyPackage(BuildContext context) async {
     if (Platform.isWindows && path.toLowerCase().endsWith('.zip')) {
       // 解到专门的目录，别碰用户自己的同名文件夹。
       // 目录名带版本号，重复解包也只覆盖自己上一次的结果。
-      final version = (st?.latest ?? '').replaceAll(RegExp(r'[^0-9A-Za-z._-]'), '');
-      final destPath = '${File(path).parent.path}${Platform.pathSeparator}'
+      final version = (st?.latest ?? '').replaceAll(
+        RegExp(r'[^0-9A-Za-z._-]'),
+        '',
+      );
+      final destPath =
+          '${File(path).parent.path}${Platform.pathSeparator}'
           'zhiji-${version.isEmpty ? 'update' : version}';
       final destDir = Directory(destPath);
       if (destDir.existsSync()) {
@@ -279,12 +283,17 @@ class _UpdateCenterSheetState extends State<_UpdateCenterSheet> {
     try {
       final result = await runUpdateCheck(context);
       if (!mounted) return;
-      if (result == null) return; // 失败已由 runUpdateCheck 提示
+      if (result == null) {
+        showTopToast('暂时无法检查更新');
+        return;
+      }
       if (result['update'] == true) {
         // 先走更新流程、后收起更新中心，顺序不能反（先 pop 会挂在已销毁路由上）。
         await showUpdateFlow(context, result);
         if (mounted) Navigator.of(context).pop();
-      } else {}
+      } else {
+        showTopToast('已是最新版本');
+      }
     } finally {
       if (mounted) setState(() => _checking = false);
     }

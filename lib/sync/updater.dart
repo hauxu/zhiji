@@ -126,7 +126,8 @@ class Updater {
     var received = resumeFrom;
     var cancelled = false;
     try {
-      sink = part.openWrite(mode: FileMode.append);
+      sink = part.openWrite(
+          mode: resumeFrom > 0 ? FileMode.append : FileMode.write);
       // 任意 30 秒没有新数据即视为连接停滞，避免弱网下无限挂起。
       await for (final chunk in res.timeout(const Duration(seconds: 30))) {
         received += chunk.length;

@@ -5,7 +5,7 @@ import 'dart:ui' show Color;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-/// 系统通知：任务提醒/情侣消息/情侣动态三通道；
+/// 系统通知：计划提醒/情侣消息/情侣动态三通道；
 /// 通道 ID 带版本后缀，调整配置时换新 ID 并清理旧通道。
 class Notify {
   Notify._();
@@ -20,25 +20,54 @@ class Notify {
   /// （旧实现 _seq=100 会和第一条留言通知抢同一个 id）。
   static int _testSeq = 0x9000;
 
-  // 通知 id 分区：
-  //   0x1000–0x3FFF 留言；0x5000–0x7FFF 动态；0x9000–0x9FFF 测试提醒；
-  //   990001 更新进度（见 showUpdateProgress）。
-  // 同一个 dedupKey（msg:/cmt:/sys: 或内容兜底）生成稳定 id：同一条消息被
-  // 两个引擎各弹一次时后一次覆盖前一次；不同消息各占一个 id，不再互相顶掉。
+  // 通知 id 分区（32 位有符号内）：留言 0x10000000 起，动态 0x40000000 起，
+  // 各占 0x20000000；测试提醒仍在 0x9000 小区间，更新进度 990001。
+  // 同一个 dedupKey（msg:/cmt:/sys:）生成稳定 id，多引擎重复弹窗会覆盖同一条；
+  // 不同 dedupKey 用更宽的 hash 空间，并在最近 256 条内做一次碰撞避让。
+  static const int _messageIdBase = 0x10000000;
+  static const int _eventIdBase = 0x40000000;
+  static const int _coupleIdSpan = 0x20000000;
+  static const int _recentIdLimit = 256;
+  static final Map<String, int> _recentIds = {};
+  static final Map<int, String> _recentIdOwners = {};
+
   static int _stableHash(String key) {
     var h = 0x811c9dc5;
     for (final code in key.codeUnits) {
       h ^= code;
-      h = (h * 0x01000193) & 0x7fffffff;
+      h = (h * 0x01000193) & 0xffffffff;
     }
     return h;
   }
 
+  static int _coupleNotificationId(String key, int base) {
+    final cached = _recentIds[key];
+    if (cached != null) return cached;
+    var id = base + (_stableHash(key) % _coupleIdSpan);
+    var probes = 0;
+    while (_recentIdOwners.containsKey(id) &&
+        _recentIdOwners[id] != key &&
+        probes < 8) {
+      id = base + ((id - base + 1) % _coupleIdSpan);
+      probes++;
+    }
+    _recentIds[key] = id;
+    _recentIdOwners[id] = key;
+    if (_recentIds.length > _recentIdLimit) {
+      final oldestKey = _recentIds.keys.first;
+      final oldId = _recentIds.remove(oldestKey);
+      if (oldId != null && _recentIdOwners[oldId] == oldestKey) {
+        _recentIdOwners.remove(oldId);
+      }
+    }
+    return id;
+  }
+
   static int _messageNotificationId(String key) =>
-      0x1000 + (_stableHash(key) % 0x3000);
+      _coupleNotificationId(key, _messageIdBase);
 
   static int _eventNotificationId(String key) =>
-      0x5000 + (_stableHash(key) % 0x3000);
+      _coupleNotificationId(key, _eventIdBase);
 
   static const _chTask = 'task_reminders_v4';
   static const _chMessage = 'couple_messages_v5';
@@ -51,7 +80,7 @@ class Notify {
 
   /// 横幅引导用：渠道 id 与中文名（设置页直达列表）。
   static const bannerChannels = <(String, String)>[
-    (_chTask, '任务提醒'),
+    (_chTask, '计划提醒'),
     (_chMilestone, '倒数日提醒'),
     (_chHabit, '习惯打卡提醒'),
     (_chMessage, '情侣消息'),
@@ -134,7 +163,7 @@ class Notify {
           id,
           name,
           description: switch (id) {
-            _chTask => '到点的计划任务提醒',
+            _chTask => '到点的计划计划提醒',
             _chMilestone => '纪念日与倒数日的到点提醒',
             _chHabit => '每日习惯的打卡时间提醒',
             _chMessage => 'TA 发来的留言',
@@ -322,7 +351,7 @@ class Notify {
 
   NotificationDetails taskReminderDetails() {
     return NotificationDetails(
-      android: _details(_chTask, '任务提醒', '到点的计划任务提醒',
+      android: _details(_chTask, '计划提醒', '到点的计划计划提醒',
           category: AndroidNotificationCategory.alarm, fullScreen: true),
     );
   }

@@ -513,7 +513,7 @@ class TaskRowState extends State<TaskRow> with TickerProviderStateMixin {
     showM3Dialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('烧掉这个任务？'),
+        title: const Text('烧掉这个计划？'),
         content: Text('删除后无法恢复'),
         actions: [
           TextButton(

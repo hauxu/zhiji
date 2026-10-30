@@ -198,21 +198,26 @@ class Reminders {
       await _scheduleMaintenance();
       return;
     }
-    try {
-      await prefs.setString(_sigKey, sig);
-      debugPrint('[reminders] sig saved: ${(prefs.getString(_sigKey) ?? "null").substring(0, 8)}');
-    } catch (e) {
-      debugPrint('[reminders] sig save failed: $e');
-    }
 
+    var scheduleFailed = false;
     final notify = Notify.instance;
     for (final id in _scheduled) {
       try {
         await notify.plugin.cancel(id);
-      } catch (_) {}
+      } catch (e) {
+        scheduleFailed = true;
+        debugPrint('[reminders] cancel fail id=$id: $e');
+      }
     }
     _scheduled = [];
-    if (Platform.isAndroid) await FocusIsland.cancelIslands();
+    if (Platform.isAndroid) {
+      try {
+        await FocusIsland.cancelIslands();
+      } catch (e) {
+        scheduleFailed = true;
+        debugPrint('[reminders] cancel islands fail: $e');
+      }
+    }
 
     // 习惯打卡提醒先排。Windows 不支持每日重复需逐日占位，
     // 给习惯一段独立预算（约三成），避免挤掉任务与倒数日提醒。
@@ -251,7 +256,10 @@ class Reminders {
             );
             _scheduled.add(nextId);
             nextId++;
-          } catch (_) {}
+          } catch (e) {
+            scheduleFailed = true;
+            debugPrint('[reminders] habit zonedSchedule fail id=$nextId: $e');
+          }
           if (!habitDailyRepeat) {
             day = day.add(const Duration(days: 1));
             placed++;
@@ -280,7 +288,12 @@ class Reminders {
         nextId++;
       }
       debugPrint('[reminders] island items=${items.length}');
-      await FocusIsland.scheduleIslands(items);
+      try {
+        await FocusIsland.scheduleIslands(items);
+      } catch (e) {
+        scheduleFailed = true;
+        debugPrint('[reminders] island schedule fail: $e');
+      }
     } else {
       for (final item in pending) {
         // Windows 习惯提醒可能已占满预算，任务/倒数日受同一总额约束。
@@ -299,7 +312,10 @@ class Reminders {
           );
           _scheduled.add(nextId);
           nextId++;
-        } catch (e) { debugPrint('[reminders] zonedSchedule fail id=$nextId: $e'); }
+        } catch (e) {
+          scheduleFailed = true;
+          debugPrint('[reminders] zonedSchedule fail id=$nextId: $e');
+        }
       }
     }
     debugPrint('[reminders] done, scheduled=${_scheduled.length}');
@@ -318,7 +334,28 @@ class Reminders {
               'endAt': p.liveEnd!.millisecondsSinceEpoch,
             },
       ];
-      await NativeShare.scheduleTaskLive(liveItems);
+      try {
+        await NativeShare.scheduleTaskLive(liveItems);
+      } catch (e) {
+        scheduleFailed = true;
+        debugPrint('[reminders] live schedule fail: $e');
+      }
+    }
+    if (!scheduleFailed) {
+      try {
+        await prefs.setString(_sigKey, sig);
+        debugPrint('[reminders] sig saved: ${sig.substring(0, 8)}');
+      } catch (e) {
+        debugPrint('[reminders] sig save failed: $e');
+      }
+    } else {
+      // 失败时清掉旧签名，下一次调用会重新排，而不是因签名相同跳过。
+      try {
+        await prefs.remove(_sigKey);
+      } catch (e) {
+        debugPrint('[reminders] sig clear failed: $e');
+      }
+      debugPrint('[reminders] schedule failed, sig not saved');
     }
     await _scheduleMaintenance();
   }
@@ -433,7 +470,7 @@ class Reminders {
         }
         pending.add((
           time: local,
-          title: '任务提醒 · ${_dayLabel(day)}',
+          title: '计划提醒 · ${_dayLabel(day)}',
           body: '${task.timeLabel.isEmpty ? '' : '${task.timeLabel}  '}'
               '${task.title}',
           milestone: false,
@@ -457,7 +494,7 @@ class Reminders {
                 pending.length < _maxPending) {
               pending.add((
                 time: due,
-                title: '任务即将结束 · ${_dayLabel(day)}',
+                title: '计划即将结束 · ${_dayLabel(day)}',
                 body: '${task.timeLabel.isEmpty ? '' : '${task.timeLabel}  '}'
                     '${task.title}',
                 milestone: false,

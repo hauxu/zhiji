@@ -440,19 +440,40 @@ class _JournalPageState extends State<JournalPage> with WidgetsBindingObserver {
       }
       return;
     }
+    final savedPaths = <String>[];
     for (final p in pics) {
       final saved = await copyIntoAppDir(p.path, 'journal_images');
       if (saved == null) continue;
       if (!mounted) {
         // 页面已关：刚复制的文件没人引用，顺手清掉。
-        unawaited(deleteAttachQuietly(saved, 'journal_images'));
+        for (final path in [...savedPaths, saved]) {
+          unawaited(deleteAttachQuietly(path, 'journal_images'));
+        }
         return;
       }
-      if (!_images.contains(saved)) _images.add(saved);
+      savedPaths.add(saved);
     }
-    if (!mounted) return;
-    _persistImages(entryKey);
-    setState(() {});
+    if (savedPaths.isEmpty) return;
+    // 复制期间可能已切日：按捕获的键写回，不碰当前正在编辑的条目。
+    final images = List<String>.from(
+      _store.data.journal[entryKey]?.images ?? const <String>[],
+    );
+    for (final path in savedPaths) {
+      if (!images.contains(path)) images.add(path);
+    }
+    if (!mounted) {
+      for (final path in savedPaths) {
+        unawaited(deleteAttachQuietly(path, 'journal_images'));
+      }
+      return;
+    }
+    if (_entryKey == entryKey) {
+      _images = images;
+      _persistImages(entryKey);
+    } else {
+      _store.setJournalImages(entryKey, images);
+      setState(() {});
+    }
   }
 
   void _removeImage(int index) {
@@ -763,7 +784,7 @@ class _JournalPageState extends State<JournalPage> with WidgetsBindingObserver {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            entry.shared ? '对方可见' : '给对方看',
+                            entry.shared ? 'TA 可见' : '给 TA 看',
                             style: TextStyle(
                               fontSize: 12,
                               color: entry.shared

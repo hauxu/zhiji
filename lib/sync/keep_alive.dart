@@ -32,14 +32,19 @@ class KeepAliveBridge {
   }
 
   /// 启动保活：把后台入口的回调句柄交给原生，由服务另起引擎执行。
-  static Future<void> start() async {
-    if (!Platform.isAndroid) return;
+  /// 返回 false 表示没起来（原生异常或平台不支持），调用方据此决定是否重试。
+  static Future<bool> start() async {
+    if (!Platform.isAndroid) return false;
     try {
       final handle = PluginUtilities.getCallbackHandle(keepAliveEntry);
+      if (handle == null) return false;
       await _channel.invokeMethod('startKeepAlive', {
-        'handle': handle?.toRawHandle() ?? 0,
+        'handle': handle.toRawHandle(),
       });
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// 停止保活并移除常驻通知。

@@ -7,7 +7,7 @@ import '../ui_prefs.dart';
 import '../sync/sync_service.dart';
 
 /// 倒数本设置面板：显示与排序偏好，仅本机生效。
-/// [couple] 为 true 时读写情侣「纪念日」的独立设置（与日子页互不影响）。
+/// [couple] 为 true 时读写情侣倒数本的独立设置（与日子页互不影响）。
 Future<void> showBookSettingsSheet(
   BuildContext context, {
   bool couple = false,
@@ -44,7 +44,7 @@ class _BookSettingsSheet extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
             child: Text(
-              couple ? '纪念日设置' : '倒数本设置',
+              '倒数本设置',
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
@@ -107,9 +107,9 @@ class _BookSettingsSheet extends StatelessWidget {
           ),
           if (couple)
             ListTile(
-              title: const Text('纪念日名称', style: TextStyle(fontSize: 14)),
+              title: const Text('倒数本名称', style: TextStyle(fontSize: 14)),
               subtitle: Text(
-                currentName.isEmpty ? '纪念日' : currentName,
+                currentName.isEmpty ? '倒数本' : currentName,
                 style: const TextStyle(fontSize: 11),
               ),
               trailing: const Icon(Icons.edit_outlined, size: 18),
@@ -130,7 +130,7 @@ class _BookSettingsSheet extends StatelessWidget {
   }
 }
 
-/// 纪念日重命名对话框：controller 由自身 State 持有，
+/// 倒数本重命名对话框：controller 由自身 State 持有，
 /// 随路由卸载释放（外层 dispose 会在退出动画前触发 debug 断言）。
 class _RenameDialog extends StatefulWidget {
   const _RenameDialog({required this.initial});
@@ -143,7 +143,7 @@ class _RenameDialog extends StatefulWidget {
 
 class _RenameDialogState extends State<_RenameDialog> {
   late final TextEditingController _ctrl = TextEditingController(
-    text: widget.initial.isEmpty ? '纪念日' : widget.initial,
+    text: widget.initial.isEmpty ? '倒数本' : widget.initial,
   );
 
   @override
@@ -155,12 +155,12 @@ class _RenameDialogState extends State<_RenameDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('纪念日名称'),
+      title: const Text('倒数本名称'),
       content: TextField(
         controller: _ctrl,
         autofocus: true,
         maxLength: 20,
-        decoration: const InputDecoration(hintText: '如：纪念日、我们的日子'),
+        decoration: const InputDecoration(hintText: '如：我们的日子'),
       ),
       actions: [
         TextButton(

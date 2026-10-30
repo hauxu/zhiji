@@ -3,7 +3,7 @@ description: "之计：两个人的手帐风计划应用，含清单、计划、
 homepage: https://www.huaxu.xin/zhiji/
 repository: https://github.com/hauxu/zhiji
 publish_to: 'none'
-version: 5.16.23+131
+version: 5.16.26+134
 
 environment:
   sdk: ^3.13.2

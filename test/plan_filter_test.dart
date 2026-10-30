@@ -66,7 +66,7 @@ void main() {
     expect(find.text('全部'), findsNothing);
   });
 
-  testWidgets('绑定后筛选入口常驻，切到「对方」能回调', (tester) async {
+  testWidgets('绑定后筛选入口常驻，切到「TA」能回调', (tester) async {
     final (store, sync) = await _setup(bound: true);
     var selected = PlanFilter.all;
     await tester.pumpWidget(_wrap(
@@ -85,10 +85,10 @@ void main() {
 
     await tester.tap(find.text('全部'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('对方（小乙）'));
+    await tester.tap(find.text('TA（小乙）'));
     await tester.pumpAndSettle();
     expect(selected, PlanFilter.ta);
-    // 选「对方」后筛选入口仍在（曾经的死锁场景）。
+    // 选「TA」后筛选入口仍在（曾经的死锁场景）。
     expect(find.text('小乙'), findsOneWidget);
   });
 

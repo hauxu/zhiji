@@ -79,7 +79,7 @@ class _MilestoneEditSheetState extends State<_MilestoneEditSheet> {
           initialDay: _lunarDay,
         ),
       );
-      if (picked == null) return;
+      if (picked == null || !mounted) return;
       final (code, day, _) = picked;
       final leap = code < 0;
       final month = leap ? -code : code;
@@ -113,9 +113,8 @@ class _MilestoneEditSheetState extends State<_MilestoneEditSheet> {
       firstDate: DateTime(now.year - 100, now.month, now.day),
       lastDate: DateTime(now.year + 10, now.month, now.day),
     );
-    if (picked != null) {
-      setState(() => _date = dateKey(picked));
-    }
+    if (picked == null || !mounted) return;
+    setState(() => _date = dateKey(picked));
   }
 
   void _toggleLunar(bool on) {

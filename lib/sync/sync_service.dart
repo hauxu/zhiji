@@ -80,6 +80,7 @@ class SyncService extends ChangeNotifier {
   // 已读回执待上行：markSeen 时若有同步在途，本次结束后立刻短请求补发。
   bool _readReceiptPending = false;
   bool _syncing = false;
+  bool _disposed = false;
   // 本轮加密时发现共享密钥缺失：置位后放弃上传，防止明文共享包外泄。
   bool _sharedKeyMissing = false;
   bool _dirty = false;
@@ -100,7 +101,7 @@ class SyncService extends ChangeNotifier {
   static const _maxBackoffForeground = Duration(seconds: 15);
   /// 客户端版本：随 sync 请求上报；服务端在账号有加密备份时据此拒绝旧版 push。
   /// 发版时须与 pubspec.yaml 的 version 保持一致（只取 x.y.z）。
-  static const clientVersion = '5.16.23';
+  static const clientVersion = '5.16.26';
   int _failStreak = 0; // 连续网络类失败次数，驱动指数退避
   bool _offline = false;
   bool _boardVisible = false;
@@ -228,6 +229,27 @@ class SyncService extends ChangeNotifier {
         .map((b) => b.toRadixString(16).padLeft(2, '0'))
         .join();
   }
+
+  static final RegExp _cursorNumericRe = RegExp(r'^[0-9]+$');
+
+  static bool _isCanonicalCursorNumber(String s) =>
+      _cursorNumericRe.hasMatch(s) && (s.length == 1 || s[0] != '0');
+
+  /// 游标 id 全序，与服务端 _cursor_id_lt 保持一致。
+  static int _compareCursorIds(String a, String b) {
+    if (_isCanonicalCursorNumber(a) && _isCanonicalCursorNumber(b)) {
+      final ai = int.tryParse(a);
+      final bi = int.tryParse(b);
+      if (ai != null && bi != null && ai != bi) return ai.compareTo(bi);
+    }
+    if (a.length != b.length) return a.length.compareTo(b.length);
+    return a.compareTo(b);
+  }
+
+  static int _compareCursorKeys(int atA, String idA, int atB, String idB) {
+    if (atA != atB) return atA.compareTo(atB);
+    return _compareCursorIds(idA, idB);
+  }
   /// 上一次协商用的对方公钥；对方换密钥对后要据此重算备用密钥。
   String _couplePeerPubB64 = '';
 
@@ -337,7 +359,15 @@ class SyncService extends ChangeNotifier {
   }
 
   @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
+
+  @override
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _stopLoop();
     _netSub?.cancel();
     _store.removeListener(_onStoreChanged);
@@ -363,8 +393,9 @@ class SyncService extends ChangeNotifier {
     journalKeyPrevBase64 = prefs.getString('gd2_journal_key_prev') ?? '';
     deviceId = prefs.getString('gd2_device_id') ?? '';
     if (deviceId.length < 16) {
-      deviceId = DateTime.now().microsecondsSinceEpoch.toRadixString(36) +
-          DateTime.now().microsecondsSinceEpoch.toRadixString(36);
+      deviceId = List<int>.generate(16, (_) => _rng.nextInt(256))
+          .map((b) => b.toRadixString(16).padLeft(2, '0'))
+          .join();
       unawaited(prefs.setString('gd2_device_id', deviceId));
     }
     coupleKeyBase64 = prefs.getString('gd2_couple_key') ?? '';
@@ -456,7 +487,10 @@ class SyncService extends ChangeNotifier {
     try {
       final v = jsonDecode(raw);
       if (v is Map) return from(Map<String, dynamic>.from(v));
-    } catch (_) {}
+      _reportCorruptPrefs(key, raw, '不是 JSON 对象');
+    } catch (e) {
+      _reportCorruptPrefs(key, raw, e);
+    }
     return null;
   }
 
@@ -467,13 +501,42 @@ class SyncService extends ChangeNotifier {
     try {
       final v = jsonDecode(raw);
       if (v is List) {
-        return v.whereType<Map>().map((e) => from(Map<String, dynamic>.from(e))).toList();
+        final maps = v.whereType<Map>().toList();
+        if (maps.length != v.length) {
+          _reportCorruptPrefs(key, raw, '列表里有非对象条目');
+        }
+        return maps.map((e) => from(Map<String, dynamic>.from(e))).toList();
       }
-    } catch (_) {}
+      _reportCorruptPrefs(key, raw, '不是 JSON 列表');
+    } catch (e) {
+      _reportCorruptPrefs(key, raw, e);
+    }
     return [];
   }
 
+  static void _reportCorruptPrefs(String key, String raw, Object error) {
+    debugPrint('本地数据损坏 key=$key err=$error，已备份原始内容');
+    unawaited(_backupCorruptPrefs(key, raw));
+  }
+
+  static Future<void> _backupCorruptPrefs(String key, String raw) async {
+    try {
+      final root = await getApplicationSupportDirectory();
+      final dir = Directory(
+          '${root.path}${Platform.pathSeparator}sync_corrupt');
+      await dir.create(recursive: true);
+      final safeKey = key.replaceAll(RegExp(r'[^A-Za-z0-9_.-]'), '_');
+      final file = File('${dir.path}${Platform.pathSeparator}'
+          '${safeKey}_${DateTime.now().millisecondsSinceEpoch}.json');
+      await file.writeAsString(raw, flush: true);
+      debugPrint('本地数据损坏备份: ${file.path}');
+    } catch (e) {
+      debugPrint('本地数据损坏备份失败: $e');
+    }
+  }
+
   Future<void> _persist() async {
+    if (_disposed) return;
     final prefs = await SharedPreferences.getInstance();
     Future<void> put(String key, String? value) async {
       if (value != null) { await prefs.setString(key, value); } else { await prefs.remove(key); }
@@ -679,6 +742,10 @@ class SyncService extends ChangeNotifier {
     }
     _stopLoop(); _store.removeListener(_onStoreChanged);
     _clearCoupleLocally();
+    _identityPrivB64 = '';
+    _identityPubB64 = '';
+    _peerIdentityPubB64 = '';
+    identityKeyChanged = false;
     token = null; accountId = null; username = '';
     // 清理账号级数据：数据密钥/恢复码/头像。
     // 密钥另存到 last 键供解锁预填。
@@ -889,6 +956,7 @@ class SyncService extends ChangeNotifier {
   /// 前台长轮询实时同步；退后台由常驻保活服务继续长轮询，
   /// 保活被关闭或系统不给跑时退回 15s 短同步 + 精确闹钟兜底。
   void setForeground(bool fg) {
+    if (_disposed) return;
     if (_foreground == fg) return;
     _foreground = fg;
     if (loggedIn) _startLoop();
@@ -932,14 +1000,21 @@ class SyncService extends ChangeNotifier {
   /// 从后台启动前台服务，而「从最近任务划掉 App」时进程已无任何回调
   /// 时机；只有一直在跑的 START_STICKY 服务才可能在划掉后继续收消息。
   Future<void> _syncKeepAlive() async {
-    if (!Platform.isAndroid) return;
+    if (_disposed || !Platform.isAndroid) return;
     final shouldRun = KeepAliveBridge.enabled && loggedIn && isBound;
     if (shouldRun == _keepAliveActive) return;
-    _keepAliveActive = shouldRun;
     if (shouldRun) {
-      await KeepAliveBridge.start();
+      // 原生没起来就保持 false，下次会话变化还会重试。
+      final started = await KeepAliveBridge.start();
+      _keepAliveActive = started;
+      if (!started) debugPrint('keepalive start failed');
     } else {
-      await KeepAliveBridge.stop();
+      try {
+        await KeepAliveBridge.stop();
+      } catch (e) {
+        debugPrint('keepalive stop failed: $e');
+      }
+      _keepAliveActive = false;
     }
   }
 
@@ -1158,6 +1233,7 @@ class SyncService extends ChangeNotifier {
 
   /// 留言板可见时切换到 2s 快轮，消息与已读回执接近实时。
   void setBoardVisible(bool visible) {
+    if (_disposed) return;
     if (_boardVisible == visible) return;
     _boardVisible = visible;
     if (loggedIn) _startLoop();
@@ -1167,6 +1243,7 @@ class SyncService extends ChangeNotifier {
   bool get boardVisible => _boardVisible;
 
   void _startLoop() {
+    if (_disposed) return;
     _stopLoop();
     Duration nextInterval() {
       if (_offline) return _offlineProbe;
@@ -1181,6 +1258,7 @@ class SyncService extends ChangeNotifier {
     void tick() {
       _pollTimer = Timer(nextInterval(), () {
         _pollTimer = null;
+        if (_disposed) return;
         // 心跳与同步成败无关：只要界面引擎还在跑，后台引擎就该让位。
         unawaited(_beat());
         if (status == CoupleStatus.waiting &&
@@ -1204,6 +1282,7 @@ class SyncService extends ChangeNotifier {
   void _watchNetwork() {
     try {
       _netSub = Connectivity().onConnectivityChanged.listen((results) {
+        if (_disposed) return;
         final offline = results.isEmpty ||
             results.every((r) => r == ConnectivityResult.none);
         if (offline == _offline) return;
@@ -1231,6 +1310,7 @@ class SyncService extends ChangeNotifier {
   }
 
   void _onStoreChanged() {
+    if (_disposed) return;
     if (!loggedIn) return;
     if (_suppressStoreEvents) return;
     if (_suppressNextPush) {
@@ -1267,8 +1347,10 @@ class SyncService extends ChangeNotifier {
   }
 
   void schedulePush() {
+    if (_disposed) return;
     _pushDebounce?.cancel();
     _pushDebounce = Timer(const Duration(seconds: 2), () {
+      if (_disposed) return;
       if (!loggedIn) return;
       if (!autoBackup) return; // 关闭自动备份：改动留在本机，等手动备份
       syncNow(push: true);
@@ -1277,6 +1359,10 @@ class SyncService extends ChangeNotifier {
 
   Future<void> syncNow({required bool push, bool forceShort = false,
       bool manual = false, void Function(bool pushed)? onPushResult}) async {
+    if (_disposed) {
+      onPushResult?.call(false);
+      return;
+    }
     if (!loggedIn) {
       onPushResult?.call(false);
       return;
@@ -1301,6 +1387,7 @@ class SyncService extends ChangeNotifier {
         _dirty = true;
         _pushDebounce?.cancel();
         _pushDebounce = Timer(const Duration(seconds: 3), () {
+          if (_disposed) return;
           if (loggedIn) syncNow(push: true, manual: manual);
         });
       }
@@ -1388,7 +1475,7 @@ class SyncService extends ChangeNotifier {
       }
 
       // 会话已切换（登出/换号/解绑）：丢弃过期结果。
-      if (sessionToken != token ||
+      if (_disposed || sessionToken != token ||
           sessionAccount != accountId ||
           sessionEpoch != _bindEpoch) {
         return;
@@ -1430,7 +1517,12 @@ class SyncService extends ChangeNotifier {
       }
       if (result is Map) {
         await _applySyncResult(Map<String, dynamic>.from(result), pushed: push);
-        if (push) _dirty = false;
+        if (_disposed) return;
+        if (push) {
+          _dirty = false;
+          // 推送成功后立刻持久化脏标记，否则重启会重复推。
+          await _persist();
+        }
         onPushResult?.call(push);
       }
     } on SyncException catch (e) {
@@ -1453,7 +1545,7 @@ class SyncService extends ChangeNotifier {
     } finally {
       _syncing = false;
       // 在途期间 markSeen 过：立即以短请求补发已读回执（不等下一轮询）。
-      if (_readReceiptPending && loggedIn) {
+      if (_readReceiptPending && loggedIn && !_disposed) {
         _readReceiptPending = false;
         unawaited(syncNow(push: _dirty, forceShort: true));
       }
@@ -1595,6 +1687,7 @@ class SyncService extends ChangeNotifier {
 
   Future<void> _applySyncResult(Map<String, dynamic> result, {required bool pushed}) async {
     final events = <CoupleEvent>[];
+    var preserveLastError = false;
     // 本方法内有多个 await（解密/派生/落盘），期间会话可能已切换
     // （登出/解绑），认领分支前必须复核，防止已清状态被复活。
     final applyEpoch = _bindEpoch;
@@ -1781,9 +1874,10 @@ class SyncService extends ChangeNotifier {
           // 签名缺失或对不上：公钥可能是服务端换的，按不可信处理。
           peerPubTrusted = false;
           identityKeyChanged = true;
+          preserveLastError = true;
           await _persist();
           notifyListeners();
-          lastError = '对方公钥验签失败，已暂停更新共享密钥';
+          lastError = 'TA 的公钥验签失败，已暂停更新共享密钥';
           _raiseIdentityIssueOnce();
         } else if (_peerIdentityPubB64.isEmpty) {
           _peerIdentityPubB64 = partnerIdPub;
@@ -1792,6 +1886,7 @@ class SyncService extends ChangeNotifier {
           // 身份公钥换了（换机重装）：先不跟随，等用户核对安全码。
           peerPubTrusted = false;
           identityKeyChanged = true;
+          preserveLastError = true;
           await _persist();
           notifyListeners();
           _raiseIdentityIssueOnce();
@@ -1957,18 +2052,32 @@ class SyncService extends ChangeNotifier {
     lastSnapshotsTruncated = result['snapshotsTruncated'] == true;
     if (lastSnapshotsTruncated) _scheduleSnapshotRefetch();
     if (lastSyncTruncated) {
-      // 游标用 (时间戳, id)：同一毫秒里有多条时也不会漏/重。
-      final at = result['oldestMessageAt'] ?? result['oldestCommentAt'];
-      final id = result['oldestMessageId'] ?? result['oldestCommentId'];
-      final nextAt = at is int && at > 0 ? at : 0;
-      final nextId = id is String ? id : '';
+      // 取消息和评价两个游标里较小的那个，服务端下一轮才不会再回重复条。
+      final msgAt = result['oldestMessageAt'];
+      final msgId = result['oldestMessageId'];
+      final cmtAt = result['oldestCommentAt'];
+      final cmtId = result['oldestCommentId'];
+      var nextAt = 0;
+      var nextId = '';
+      if (msgAt is int && msgAt > 0) {
+        nextAt = msgAt;
+        nextId = msgId is String ? msgId : '';
+      }
+      if (cmtAt is int && cmtAt > 0) {
+        final candidateId = cmtId is String ? cmtId : '';
+        if (nextAt == 0 ||
+            _compareCursorKeys(cmtAt, candidateId, nextAt, nextId) < 0) {
+          nextAt = cmtAt;
+          nextId = candidateId;
+        }
+      }
       final advanced = nextAt != _olderBeforeAt || nextId != _olderBeforeId;
       if (nextAt > 0 && advanced && _olderRounds < 20) {
         _olderBeforeAt = nextAt;
         _olderBeforeId = nextId;
         _olderRounds++;
         unawaited(Future<void>.delayed(const Duration(milliseconds: 800), () {
-          if (loggedIn) syncNow(push: false);
+          if (!_disposed && loggedIn) syncNow(push: false);
         }));
       } else {
         _olderBeforeAt = 0;
@@ -1985,16 +2094,16 @@ class SyncService extends ChangeNotifier {
       cloudBackupAt = lastSyncAt;
       _lastPushAt = DateTime.now().millisecondsSinceEpoch;
     }
-    lastError = null;
+    if (!preserveLastError) lastError = null;
     // 保活通知里显示「最近同步 HH:mm」；顺带写主引擎心跳。
     unawaited(KeepAliveBridge.touchLastSync());
     unawaited(_beat());
     if (!adoptSilently) unseenCount += events.length;
     // 处理期间会话已切换：不再把处理中途拼出的状态写回磁盘。
-    if (sessionStale()) return;
+    if (_disposed || sessionStale()) return;
     await _persist(); notifyListeners();
     // 会话在处理期间切换：事件不再派发（弹「绑定成功」到已登出界面）。
-    if (!sessionStale()) {
+    if (!_disposed && !sessionStale()) {
       for (final e in events) { onEvent?.call(e); }
     }
   }
@@ -2022,8 +2131,21 @@ class SyncService extends ChangeNotifier {
           ...deviceSharedJournal,
         };
       }
-      final theirTombs = ((decrypted['tombs'] ?? const {}) as Map)
-          .map((k, v) => MapEntry(k.toString(), (v as num).toInt()));
+      final rawTombs = decrypted['tombs'];
+      final theirTombs = <String, int>{};
+      if (rawTombs is Map) {
+        for (final entry in rawTombs.entries) {
+          final value = entry.value;
+          final ts = value is int
+              ? value
+              : value is num && value.isFinite
+                  ? value.toInt()
+                  : value is String
+                      ? int.tryParse(value)
+                      : null;
+          if (ts != null) theirTombs[entry.key.toString()] = ts;
+        }
+      }
       final (m, tombs) = AppStore.mergeAppData(
         mine: merged,
         theirs: AppData.fromJson(decrypted),
@@ -2204,12 +2326,19 @@ class SyncService extends ChangeNotifier {
         try {
           final idPlain = await _tryDecryptJournal(idPrivEnc);
           if (idPlain != null && idPlain.isNotEmpty) {
-            _identityPrivB64 = idPlain;
+            final derived =
+                await JournalCrypto.identityPublicFromPrivate(idPlain);
             final idPub = priv['identityPub'];
-            _identityPubB64 = (idPub is String && idPub.isNotEmpty)
-                ? idPub
-                : await JournalCrypto.identityPublicFromPrivate(idPlain);
-            await _persist();
+            if (idPub is String && idPub.isNotEmpty && idPub != derived) {
+              debugPrint('恢复的身份公钥与私钥不一致，丢弃并重建');
+              _identityPrivB64 = '';
+              _identityPubB64 = '';
+              await _ensureIdentityKeyPair();
+            } else {
+              _identityPrivB64 = idPlain;
+              _identityPubB64 = derived;
+              await _persist();
+            }
           }
         } catch (_) {}
       }
@@ -2768,11 +2897,12 @@ class SyncService extends ChangeNotifier {
   /// 快照被裁掉时补一次普通同步，把其它设备的数据拿回来。
   /// 加防重入，避免和长轮询抢着跑。
   void _scheduleSnapshotRefetch() {
+    if (_disposed) return;
     if (_snapshotRefetching) return;
     _snapshotRefetching = true;
     unawaited(Future<void>.delayed(const Duration(seconds: 2), () async {
       _snapshotRefetching = false;
-      if (loggedIn && !_syncing) await syncNow(push: false);
+      if (!_disposed && loggedIn && !_syncing) await syncNow(push: false);
     }));
   }
 
@@ -2790,7 +2920,7 @@ class SyncService extends ChangeNotifier {
     final pin = _peerIdentityPubB64.isEmpty ? 'none' : _peerIdentityPubB64;
     unawaited(notifyCoupleEventOnce(
       CoupleEvent('配对安全码对不上',
-          '对方的身份密钥和之前不一样。先核对情侣页的安全码，不一致就先解绑重配',
+          'TA 的身份密钥和之前不一样。先核对情侣页的安全码，不一致就先解绑重配',
           dedupKey: 'idkey:$pin'),
     ));
   }
@@ -2799,8 +2929,8 @@ class SyncService extends ChangeNotifier {
   void _raisePeerKeyChangedOnce() {
     final pin = _couplePeerPubPinned.isEmpty ? 'none' : _couplePeerPubPinned;
     unawaited(notifyCoupleEventOnce(
-      CoupleEvent('对方的密钥变了',
-          '如果不是对方换了手机，建议先解绑再重新绑定；现在两边还是各用各的密钥',
+      CoupleEvent('TA 的密钥变了',
+          '如果不是 TA 换了手机，建议先解绑再重新绑定；现在两边还是各用各的密钥',
           dedupKey: 'pairkey:$pin'),
     ));
   }
@@ -3046,17 +3176,29 @@ class SyncService extends ChangeNotifier {
       _msgArchive.any((m) => m['id'] == messageId);
 
   Future<void> _loadMsgArchive() async {
+    String? raw;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString('gd2_msg_archive');
+      raw = prefs.getString('gd2_msg_archive');
       if (raw == null || raw.isEmpty) return;
-      final list = (jsonDecode(raw) as List)
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-      _msgArchive = list;
-    } catch (_) {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) {
+        throw const FormatException('归档不是 JSON 列表');
+      }
+      final maps = decoded.whereType<Map>().toList();
+      if (maps.length != decoded.length) {
+        _reportCorruptPrefs(
+            'gd2_msg_archive', raw, '归档列表里有非对象条目');
+      }
+      _msgArchive =
+          maps.map((e) => Map<String, dynamic>.from(e)).toList();
+    } catch (e) {
       _msgArchive = [];
+      if (raw != null && raw.isNotEmpty) {
+        _reportCorruptPrefs('gd2_msg_archive', raw, e);
+      } else {
+        debugPrint('消息归档读取失败: $e');
+      }
     }
   }
 
@@ -3068,7 +3210,9 @@ class SyncService extends ChangeNotifier {
         _msgArchive = _msgArchive.sublist(0, 200);
       }
       await prefs.setString('gd2_msg_archive', jsonEncode(_msgArchive));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('消息归档保存失败: $e');
+    }
   }
 
   /// 收藏一条留言：保存明文快照，消息滚出窗口后仍可查看。
