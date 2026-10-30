@@ -36,7 +36,7 @@ jobs:
           cache: true
       - run: flutter pub get
       - run: flutter build apk --release
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: zhiji-apk
           path: build/app/outputs/flutter-apk/app-release.apk
