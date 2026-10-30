@@ -109,6 +109,12 @@ Windows 换成 `flutter build windows --release`，产物在 `build/windows/x64/
 - 日记图片和清单附件不离开本机
 - 恢复码丢了日记就解不开，可以用本机数据重建一份备份
 
+## 联系
+
+- 网站：<https://www.huaxu.xin/zhiji/>
+- 邮箱：<huaxu@huaxu.xin>
+- 问题与建议：<https://github.com/hauxu/zhiji/discussions>
+
 ## 许可
 
 客户端 GPL-3.0（[LICENSE](LICENSE)），服务端 AGPL-3.0（[server/LICENSE](server/LICENSE)）。
