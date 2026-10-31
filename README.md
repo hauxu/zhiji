@@ -10,7 +10,7 @@
 [![platform](https://img.shields.io/badge/Android%20%7C%20Windows-4C8C6A?style=for-the-badge)](#-下载)
 [![license](https://img.shields.io/badge/GPL--3.0-blue?style=for-the-badge)](LICENSE)
 
-[下载](#-下载) · [功能](#-功能) · [构建](#-从源码构建) · [服务端](server/README.md) · [更新日志](assets/CHANGELOG.md)
+[下载](#-下载) · [功能](#-功能) · [构建](#-从源码构建) · [服务端](server/README.md) · [更新日志](assets/CHANGELOG.md) · [改动说明](docs/DELIVERY-5.16.28.md)
 
 <br>
 
