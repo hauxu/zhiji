@@ -9,9 +9,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 
 import 'app.dart';
+import 'mcp/mcp_server.dart';
 import 'data/store.dart';
 import 'sync/couple_models.dart';
 import 'sync/keep_alive.dart';
@@ -158,6 +160,14 @@ Future<void> main() async {
       debugPrint('windows shell init failed: $e');
     }
   }
+
+  // 应用内 MCP：默认关闭，开关在「我的 → 智能体接入」。
+  unawaited(() async {
+    final info = await PackageInfo.fromPlatform();
+    final err = await McpServer.instance
+        .syncWith(store, sync, info.version);
+    if (err != null) debugPrint('mcp start failed: $err');
+  }());
 
   runApp(
     MultiProvider(

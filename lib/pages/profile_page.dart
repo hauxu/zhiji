@@ -28,6 +28,7 @@ import '../widgets/update_flow.dart';
 import '../widgets/background_sheet.dart';
 import '../widgets/keep_alive_helper.dart';
 import '../sync/sync_service.dart';
+import '../widgets/mcp_sheet.dart';
 import '../theme_store.dart';
 import '../util/native_share.dart';
 import 'archived_page.dart';
@@ -1117,6 +1118,7 @@ class _SettingsCard extends StatelessWidget {
           const Divider(height: 1, indent: 16, endIndent: 16),
           const _CardTitle('通用'),
           const _AiAssistantTile(),
+          const _McpTile(),
           const DevicesTile(),
           ListTile(
             dense: true,
@@ -1404,6 +1406,30 @@ class _MinimizeToTrayTileState extends State<_MinimizeToTrayTile> {
 }
 
 /// 「AI 助手」设置入口：只在打开/返回时读一次本机配置，build 不碰 prefs。
+class _McpTile extends StatelessWidget {
+  const _McpTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListTile(
+      dense: true,
+      leading: Icon(
+        Icons.smart_toy_outlined,
+        size: 20,
+        color: scheme.onSurfaceVariant,
+      ),
+      title: const Text('智能体接入', style: TextStyle(fontSize: 14)),
+      subtitle: Text(
+        Platform.isWindows ? '给本机智能体开放读写接口（MCP）' : '仅桌面端可用',
+        style: const TextStyle(fontSize: 11),
+      ),
+      trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+      onTap: () => showMcpSheet(context),
+    );
+  }
+}
+
 class _AiAssistantTile extends StatefulWidget {
   const _AiAssistantTile();
 
