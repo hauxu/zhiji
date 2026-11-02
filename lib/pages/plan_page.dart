@@ -548,6 +548,24 @@ class DayTaskSection extends StatelessWidget {
       );
     }
 
+    // 备忘录不跟日期走：任何一天打开都显示同一批，放在当天安排后面。
+    final memos = store.memoTasks();
+    Widget? memoSection;
+    // 没有备忘录时不占位，避免每天多一张空卡片。
+    if (showMine && memos.isNotEmpty) {
+      memoSection = _TaskRowsSection(
+        title: '备忘录',
+        headerTrailing: Text(
+          '长期留存',
+          style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+        ),
+        emptyHint: '暂无备忘录。新建计划时把日期留空，就会一直留在这里',
+        tasks: memos,
+        scope: 'memo',
+        anchor: date,
+      );
+    }
+
     if (sections.isEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -565,6 +583,10 @@ class DayTaskSection extends StatelessWidget {
               ),
             ),
           ),
+          if (memoSection != null) ...[
+            const SizedBox(height: 12),
+            memoSection,
+          ],
         ],
       );
     }
@@ -575,6 +597,10 @@ class DayTaskSection extends StatelessWidget {
         for (var i = 0; i < sections.length; i++) ...[
           if (i > 0) const SizedBox(height: 12),
           sections[i],
+        ],
+        if (memoSection != null) ...[
+          const SizedBox(height: 12),
+          memoSection,
         ],
       ],
     );
@@ -890,22 +916,7 @@ class _WeekBodyState extends State<_WeekBody> {
             padding: const EdgeInsets.fromLTRB(16, 0, 8, 96),
             children: [
               if (filterRow != null) ...[filterRow, const SizedBox(height: 10)],
-              if (showMine)
-                _TaskRowsSection(
-                  title: '本周计划',
-                  headerTrailing: Text(
-                    '不设日期的计划都在这里完成',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  emptyHint: '不设日期的计划会显示在这里',
-                  tasks: store.weekTasks(),
-                  scope: 'week',
-                  anchor: widget.weekStart,
-                ),
-              if (showMine) const SizedBox(height: 16),
+              // 有日期的排前面，没有日期的备忘录固定留在最下面。
               for (var i = 0; i < 7; i++)
                 if ((dayTasks[i] ?? const []).isNotEmpty ||
                     (partnerDayTasks[i] ?? const []).isNotEmpty) ...[
@@ -921,6 +932,23 @@ class _WeekBodyState extends State<_WeekBody> {
                   ),
                   const SizedBox(height: 10),
                 ],
+              if (showMine) ...[
+                const SizedBox(height: 6),
+                _TaskRowsSection(
+                  title: '备忘录',
+                  headerTrailing: Text(
+                    '长期留存',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  emptyHint: '暂无备忘录。新建计划时把日期留空，就会一直留在这里',
+                  tasks: store.memoTasks(),
+                  scope: 'memo',
+                  anchor: widget.weekStart,
+                ),
+              ],
             ],
           ),
         ),

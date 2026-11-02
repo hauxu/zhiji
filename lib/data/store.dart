@@ -692,6 +692,9 @@ class AppStore extends ChangeNotifier {
     return list;
   }
 
+  /// 没有日期的计划：在计划页当备忘录长期留存，不随周切换消失。
+  List<PlanTask> memoTasks() => weekTasks();
+
   /// 本周内完成的无日期任务。
   List<PlanTask> weekTasks() => data.tasks
       .where((t) => !t.hasDate && !t.isRecurring && !t.archived)
