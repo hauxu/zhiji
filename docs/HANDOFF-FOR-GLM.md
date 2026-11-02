@@ -3,8 +3,8 @@
 这份文档写给下一个接手这个仓库的模型/开发者。目标：读完就能在这个工作目录里安全地改代码、跑测试、发版，不踩我们已经踩过的坑。
 
 - 仓库根目录：`F:\workspace\zcode\goalday`
-- 当前分支：`main`，HEAD 提交 `ea39909`
-- 版本：`5.16.28+136`（`pubspec.yaml` / `windows/setup.iss` / `lib/sync/sync_service.dart` 的 `clientVersion` 三处必须一致）
+- 当前分支：`main`，HEAD 提交 `7d788be`
+- 版本：`5.16.29+137`（`pubspec.yaml` / `windows/setup.iss` / `lib/sync/sync_service.dart` 的 `clientVersion` 三处必须一致）
 - 工作区状态：干净，无未提交改动
 
 ---
@@ -74,6 +74,40 @@ ZHIZI_SYNC_HOST / ZHIZI_SYNC_PORT / ZHIZI_SYNC_APPKEY / ZHIZI_SYNC_CERT
 ```
 
 本地联调用的自签证书种子和测试账号在 `.localtest/`，已被 `.gitignore` 排除，不要提交。
+
+---
+
+## 2.5 最新一轮（5.16.29）新增的两块
+
+### 计划页当备忘录
+
+- 规则：`PlanTask.date == ''` 且非重复任务的，就是备忘录；不新增类型，不动同步协议
+- `AppStore.memoTasks()` 是 `weekTasks()` 的语义别名
+- `lib/pages/plan_page.dart`：日视图 `DayTaskSection` 在有任务的卡片后追加「备忘录」区；周视图把原「本周计划」挪到 7 个日期分组之后
+- 空态：日视图在没有当天任务但有备忘录时，仍然显示备忘录；没有备忘录时不占位
+- 拖动排序沿用 `scope != 'day'` 分支（`reorderWeekTask`），`scope: 'memo'` 不用改判断
+
+### 内置 MCP 接口（`lib/mcp/`）
+
+| 文件 | 职责 |
+|---|---|
+| `mcp_server.dart` | `HttpServer` 只绑定 127.0.0.1，Streamable HTTP，JSON-RPC 分发，Bearer 鉴权，每秒 60 次限流 |
+| `mcp_protocol.dart` | JSON-RPC 响应与错误码 |
+| `mcp_tools.dart` | 18 个工具（读 12 + 写 6 类），每个带 `annotations.readOnlyHint` |
+| `mcp_settings.dart` | `gd2_mcp_enabled` / `_port` / `_token` / `_allow_write` / `_allow_private` |
+| `mcp_audit.dart` | 最近 100 次调用 |
+| `lib/widgets/mcp_sheet.dart` | 设置面板：开关、端口、Token、权限、复制配置、日志 |
+
+要点：
+
+- 传输是 MCP `2025-06-18` Streamable HTTP，无状态；`GET /mcp` 返回 405，`GET /healthz` 免鉴权
+- 工具名用下划线（规范限制）：`zhiji_plan_list`、`zhiji_plan_create` 等
+- 写入走 `AppStore` 既有方法，自动落盘、标脏、同步给伴侣端
+- 日记/留言默认不可读，需 `gd2_mcp_allow_private`；写需 `gd2_mcp_allow_write`
+- stdio 客户端用 `tools/mcp_stdio_bridge.dart` 桥接
+- 文档：`docs/MCP.md`
+
+测试：`test/mcp_server_test.dart`（真起 HTTP，10 条）、`test/mcp_sheet_test.dart`（面板渲染）、`test/memo_tasks_test.dart`（4 条）。
 
 ---
 
