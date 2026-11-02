@@ -26,7 +26,7 @@
 ## 功能
 
 <table>
-<tr><td width="120"><b>计划</b></td><td>日视图 / 周视图、重复任务、提醒、置顶、拖动排序，完成的任务自动归档</td></tr>
+<tr><td width="120"><b>计划</b></td><td>日视图 / 周视图、重复任务、提醒、置顶、拖动排序、完成自动归档；没有日期的计划留在备忘录区长期显示</td></tr>
 <tr><td><b>清单</b></td><td>备注、附件、条目日期；可自用，也可共享或与 TA 共同编辑</td></tr>
 <tr><td><b>习惯</b></td><td>打卡月历、热力图、每日提醒</td></tr>
 <tr><td><b>日子</b></td><td>日记、心情月历、倒数本（支持农历）</td></tr>
@@ -44,7 +44,7 @@
 <td><img src="docs/screenshot-days.png" alt="日子"></td>
 </tr>
 <tr align="center">
-<td><sub>计划 · 日视图</sub></td>
+<td><sub>计划 · 日视图与备忘录</sub></td>
 <td><sub>日子 · 日记与倒数本</sub></td>
 </tr>
 </table>
