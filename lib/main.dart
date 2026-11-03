@@ -298,17 +298,15 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
             ),
           )
         : effectiveTheme;
-    // 主题变化后推送标题栏。
+    // 主题或毛玻璃开关变化后推送标题栏。
     final signature =
-        '$effectiveDark|${_argb(effectiveTheme.colorScheme.surface)}'
+        '$effectiveDark|$glassOn|${_argb(effectiveTheme.colorScheme.surface)}'
         '|${_argb(effectiveTheme.colorScheme.onSurface)}';
     if (signature != _lastPushed) {
       _lastPushed = signature;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         WindowBridge.setTheme(
           dark: effectiveDark,
-          // 标题栏底色用主题表面色：DWM 的标题栏不支持透明，
-          // 不写就是一片黑，写主题色至少和内容连得上。
           caption: _argb(effectiveTheme.colorScheme.surface),
           captionText: _argb(effectiveTheme.colorScheme.onSurface),
         );
@@ -326,6 +324,20 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
         Widget wrapped = GestureDetector(
           onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
           child: child,
+        );
+
+        // 顶栏在 Scaffold 之外，没有页面背景可依托；不垫一层底色就会漏出
+        // 窗口黑底，看起来像一条不融合的深色带。浓度越低垫得越实，
+        // 顶栏和正文越不会分成两条。
+        final baseAlpha = (glassOn && !bgOn)
+            ? switch (ui.glassStrength) {0 => 1.0, 2 => 0.8, _ => 0.9}
+            : 1.0;
+        wrapped = ColoredBox(
+          color: ((glassOn || bgOn)
+                  ? effectiveTheme.colorScheme.surface
+                  : effectiveTheme.scaffoldBackgroundColor)
+              .withValues(alpha: baseAlpha),
+          child: wrapped,
         );
         // 全局自定义背景：底层是页面基础色（图片透明时露出正常
         // 底色而非黑），中间是图片按存储的不透明度直接显示
