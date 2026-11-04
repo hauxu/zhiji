@@ -1,21 +1,22 @@
-# 构建与测试。目前只在手动触发时跑：
-# 这个 GitHub 账户的 Actions 账单没结清，push 触发会直接判失败（job 不会启动）。
-# 账单处理完之后，把下面的 push / pull_request 打开即可。
+# Build and test. Manual trigger only: Actions is affected by the account billing
+# status, so auto-triggering turns every push into a red X. Use "Run workflow".
 name: Build
 
 on:
   workflow_dispatch:
-  # push:
-  # pull_request:
+
+permissions:
+  contents: read
 
 jobs:
   analyze-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.2'
           cache: true
       - run: flutter pub get
       - run: flutter analyze
@@ -24,6 +25,7 @@ jobs:
   build-apk:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -32,7 +34,7 @@ jobs:
           java-version: '17'
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.2'
           cache: true
       - run: flutter pub get
       - run: flutter build apk --release
