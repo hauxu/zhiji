@@ -6,6 +6,7 @@
 #include <objidl.h>
 #include <shobjidl_core.h>
 
+#include <algorithm>
 #include <optional>
 
 #include "flutter/generated_plugin_registrant.h"
@@ -82,11 +83,14 @@ bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
   }
-  // 按普通窗口排序，别被上次运行或外部工具留成置顶。
   HWND self = GetHandle();
   if (self) {
+    // 强制去掉 WS_CAPTION（创建时可能被 DWM 补回），材质才会铺满整窗。
+    LONG_PTR style = ::GetWindowLongPtr(self, GWL_STYLE);
+    ::SetWindowLongPtr(self, GWL_STYLE, style & ~WS_CAPTION);
+    // 按普通窗口排序，别被上次运行或外部工具留成置顶。
     ::SetWindowPos(self, HWND_NOTOPMOST, 0, 0, 0, 0,
-                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+                   SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
   }
 
   RECT frame = GetClientArea();
@@ -260,6 +264,78 @@ void FlutterWindow::HandleWindowMethod(
     HWND hwnd = GetHandle();
     if (hwnd) {
       ::PostMessage(hwnd, WM_CLOSE, 0, 0);
+    }
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
+  if (method == "matchTitleBar") {
+    // 顶栏那条的分带来自 DWM 的 caption 底色与正文背景不一致。
+    // 采样正文靠近顶栏的几处已渲染颜色，反推出能让两者一致的 caption 色。
+    HWND hwnd = GetHandle();
+    if (hwnd == nullptr) {
+      result->Success(flutter::EncodableValue(false));
+      return;
+    }
+    double alpha = 0.62;
+    int64_t surface = 0;
+    const auto* args = method_call.arguments();
+    if (args && std::holds_alternative<flutter::EncodableMap>(*args)) {
+      const auto& map = std::get<flutter::EncodableMap>(*args);
+      auto a_it = map.find(flutter::EncodableValue("alpha"));
+      if (a_it != map.end() && std::holds_alternative<double>(a_it->second)) {
+        alpha = std::get<double>(a_it->second);
+      }
+      auto s_it = map.find(flutter::EncodableValue("surface"));
+      if (s_it != map.end() && std::holds_alternative<int64_t>(s_it->second)) {
+        surface = std::get<int64_t>(s_it->second);
+      }
+    }
+    RECT wr{};
+    ::GetWindowRect(hwnd, &wr);
+    int w = wr.right - wr.left;
+    UINT dpi = ::GetDpiForWindow(hwnd);
+    if (dpi == 0) dpi = 96;
+    int y = wr.top + ::MulDiv(42, dpi, 96);
+    int rs[5] = {0}, gs[5] = {0}, bs[5] = {0};
+    HDC dc = ::GetDC(nullptr);
+    for (int i = 0; i < 5; i++) {
+      int x = wr.left + static_cast<int>(w * (0.08 + 0.21 * i));
+      COLORREF c = ::GetPixel(dc, x, y);
+      rs[i] = GetRValue(c);
+      gs[i] = GetGValue(c);
+      bs[i] = GetBValue(c);
+    }
+    ::ReleaseDC(nullptr, dc);
+    for (int i = 0; i < 5; i++) {
+      for (int j = i + 1; j < 5; j++) {
+        if (rs[j] < rs[i]) std::swap(rs[i], rs[j]);
+        if (gs[j] < gs[i]) std::swap(gs[i], gs[j]);
+        if (bs[j] < bs[i]) std::swap(bs[i], bs[j]);
+      }
+    }
+    int sr = (surface >> 16) & 0xFF;
+    int sg = (surface >> 8) & 0xFF;
+    int sb = surface & 0xFF;
+    double keep = 1.0 - alpha;
+    auto solve = [&](int rendered, int surf) -> int {
+      if (keep < 0.05) return surf;
+      int v = static_cast<int>((rendered - alpha * surf) / keep + 0.5);
+      return v < 0 ? 0 : (v > 255 ? 255 : v);
+    };
+    COLORREF target = RGB(solve(rs[2], sr), solve(gs[2], sg), solve(bs[2], sb));
+    ::DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &target, sizeof(target));
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
+  if (method == "dragWindow") {
+    // 自绘标题栏在 Flutter 视图之外收不到命中测试，拖动由 Flutter 侧发起：
+    // 模拟一次标题栏按下，交给系统进入移动循环。
+    HWND hwnd = GetHandle();
+    if (hwnd) {
+      ::ReleaseCapture();
+      ::SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0);
     }
     result->Success(flutter::EncodableValue(true));
     return;

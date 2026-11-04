@@ -200,8 +200,11 @@ bool Win32Window::Create(const std::wstring& title,
     pos_y = (work.top + work.bottom - height) / 2;
   }
 
+  // 去掉 WS_CAPTION：留着它 DWM 会在顶部留一条自己的标题栏区域，
+  // 材质铺不进去，顶栏就成了一条不融合的带子。边框与缩放由我们自绘。
   HWND window = CreateWindow(
-      window_class, title.c_str(), WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+      window_class, title.c_str(),
+      (WS_OVERLAPPEDWINDOW & ~WS_CAPTION) | WS_VISIBLE,
       pos_x, pos_y, width, height,
       nullptr, nullptr, GetModuleHandle(nullptr), this);
 

@@ -14,34 +14,39 @@ class WindowsTitleBar extends StatelessWidget {
     if (!Platform.isWindows) return const SizedBox.shrink();
     final scheme = Theme.of(context).colorScheme;
     // InkWell 需要 Material 祖先；标题栏在 Scaffold 之外，自己垫一层透明 Material。
-    return SizedBox(
-      height: 38,
-      child: Material(
-        color: Colors.transparent,
-        child: Row(
-          children: [
-            const SizedBox(width: 12),
-            Icon(Icons.favorite_rounded, size: 13, color: scheme.primary),
-            const SizedBox(width: 6),
-            Text(
-              '之计',
-              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
-            ),
-            const Spacer(),
-            _WinButton(
-              icon: Icons.remove_rounded,
-              onTap: WindowBridge.minimize,
-            ),
-            _WinButton(
-              icon: Icons.crop_square_rounded,
-              onTap: WindowBridge.toggleMaximize,
-            ),
-            _WinButton(
-              icon: Icons.close_rounded,
-              danger: true,
-              onTap: WindowBridge.closeWindow,
-            ),
-          ],
+    // 拖动也在这里发起：视图子窗口收不到命中测试，交给系统移动循环。
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onPanStart: (_) => WindowBridge.dragWindow(),
+      child: SizedBox(
+        height: 38,
+        child: Material(
+          color: Colors.transparent,
+          child: Row(
+            children: [
+              const SizedBox(width: 12),
+              Icon(Icons.favorite_rounded, size: 13, color: scheme.primary),
+              const SizedBox(width: 6),
+              Text(
+                '之计',
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              ),
+              const Spacer(),
+              _WinButton(
+                icon: Icons.remove_rounded,
+                onTap: WindowBridge.minimize,
+              ),
+              _WinButton(
+                icon: Icons.crop_square_rounded,
+                onTap: WindowBridge.toggleMaximize,
+              ),
+              _WinButton(
+                icon: Icons.close_rounded,
+                danger: true,
+                onTap: WindowBridge.closeWindow,
+              ),
+            ],
+          ),
         ),
       ),
     );

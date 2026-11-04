@@ -212,12 +212,29 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
     if (mounted) setState(() {});
   }
 
+  Timer? _matchTimer;
+
+  /// 顶栏底色按正文实际渲染颜色反推，每 1.5 秒纠正一次：
+  /// 窗口移动、桌面变化、主题切换后顶栏都能跟上。
+  void _scheduleTitleBarMatch(bool glassOn, UiPrefs ui) {
+    _matchTimer?.cancel();
+    _matchTimer = null;
+    if (!glassOn) return;
+    final alpha = switch (ui.glassStrength) {0 => 0.9, 2 => 0.34, _ => 0.62};
+    final surface = _argb(Theme.of(context).colorScheme.surface);
+    WindowBridge.matchTitleBar(alpha: alpha, surface: surface);
+    _matchTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      WindowBridge.matchTitleBar(alpha: alpha, surface: surface);
+    });
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     if (Platform.isWindows) {
       WindowsShell.instance.glassEnabled.removeListener(_onGlassChanged);
     }
+    _matchTimer?.cancel();
     super.dispose();
   }
 
@@ -298,7 +315,8 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
             ),
           )
         : effectiveTheme;
-    // 主题或毛玻璃开关变化后推送标题栏。
+    // 主题或毛玻璃开关变化后推送标题栏。开毛玻璃时 caption 交给
+    // matchTitleBar 按正文实际颜色反推，避免顶栏与正文分成两条。
     final signature =
         '$effectiveDark|$glassOn|${_argb(effectiveTheme.colorScheme.surface)}'
         '|${_argb(effectiveTheme.colorScheme.onSurface)}';
@@ -307,11 +325,14 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         WindowBridge.setTheme(
           dark: effectiveDark,
-          caption: _argb(effectiveTheme.colorScheme.surface),
-          captionText: _argb(effectiveTheme.colorScheme.onSurface),
+          caption: glassOn ? -2 : _argb(effectiveTheme.colorScheme.surface),
+          captionText: glassOn
+              ? -1
+              : _argb(effectiveTheme.colorScheme.onSurface),
         );
       });
     }
+    _scheduleTitleBarMatch(glassOn, ui);
     return MaterialApp(
       title: '之计',
       debugShowCheckedModeBanner: false,
@@ -326,19 +347,6 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
           child: child,
         );
 
-        // 顶栏在 Scaffold 之外，没有页面背景可依托；不垫一层底色就会漏出
-        // 窗口黑底，看起来像一条不融合的深色带。浓度越低垫得越实，
-        // 顶栏和正文越不会分成两条。
-        final baseAlpha = (glassOn && !bgOn)
-            ? switch (ui.glassStrength) {0 => 1.0, 2 => 0.8, _ => 0.9}
-            : 1.0;
-        wrapped = ColoredBox(
-          color: ((glassOn || bgOn)
-                  ? effectiveTheme.colorScheme.surface
-                  : effectiveTheme.scaffoldBackgroundColor)
-              .withValues(alpha: baseAlpha),
-          child: wrapped,
-        );
         // 全局自定义背景：底层是页面基础色（图片透明时露出正常
         // 底色而非黑），中间是图片按存储的不透明度直接显示
         // （唯一实现方式，不使用任何蒙版），顶层是页面内容。

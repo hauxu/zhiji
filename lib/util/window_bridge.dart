@@ -68,6 +68,28 @@ class WindowBridge {
     } catch (_) {}
   }
 
+  /// 按正文实际渲染颜色反推标题栏底色，消除顶栏与正文的分带。
+  static Future<void> matchTitleBar({
+    required double alpha,
+    required int surface,
+  }) async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<bool>('matchTitleBar', {
+        'alpha': alpha,
+        'surface': surface,
+      });
+    } catch (_) {}
+  }
+
+  /// 从标题栏发起系统移动（自绘标题栏在 Flutter 视图外，命中测试收不到）。
+  static Future<void> dragWindow() async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<bool>('dragWindow', true);
+    } catch (_) {}
+  }
+
   static Future<void> minimize() async {
     if (!Platform.isWindows) return;
     try {
