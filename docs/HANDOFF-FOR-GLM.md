@@ -100,6 +100,10 @@ ZHIZI_SYNC_HOST / ZHIZI_SYNC_PORT / ZHIZI_SYNC_APPKEY / ZHIZI_SYNC_CERT
 
 要点：
 
+- **顶栏必须垫底色**：`WindowsTitleBar` 在 Scaffold 之外，没有页面背景依托。`main.dart` 的 builder 里有一层 `ColoredBox`（浓度越低越不透明）专门垫在内容底下；去掉它顶栏会漏出窗口黑底，出现一条不融合的深色带
+- **顶栏按钮要 Material 祖先**：`InkWell` 在 Scaffold 外使用需要自己包一层透明 `Material`，否则调试期抛 "No Material widget found"
+- 窗口样式相关：客户区铺满整窗（WM_NCCALCSIZE），缩放/拖动走 WM_NCHITTEST；`WS_CAPTION` 不要去掉
+
 - 传输是 MCP `2025-06-18` Streamable HTTP，无状态；`GET /mcp` 返回 405，`GET /healthz` 免鉴权
 - 工具名用下划线（规范限制）：`zhiji_plan_list`、`zhiji_plan_create` 等
 - 写入走 `AppStore` 既有方法，自动落盘、标脏、同步给伴侣端
