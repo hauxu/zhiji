@@ -3,8 +3,8 @@
 这份文档写给下一个接手这个仓库的模型/开发者。目标：读完就能在这个工作目录里安全地改代码、跑测试、发版，不踩我们已经踩过的坑。
 
 - 仓库根目录：`F:\workspace\zcode\goalday`
-- 当前分支：`main`，HEAD 提交 `7d788be`
-- 版本：`5.16.29+137`（`pubspec.yaml` / `windows/setup.iss` / `lib/sync/sync_service.dart` 的 `clientVersion` 三处必须一致）
+- 当前分支：`main`，HEAD 提交 `982f178`
+- 版本：`5.16.33+141`（`pubspec.yaml` / `windows/setup.iss` / `lib/sync/sync_service.dart` 的 `clientVersion` 三处必须一致）
 - 工作区状态：干净，无未提交改动
 
 ---
@@ -77,7 +77,7 @@ ZHIZI_SYNC_HOST / ZHIZI_SYNC_PORT / ZHIZI_SYNC_APPKEY / ZHIZI_SYNC_CERT
 
 ---
 
-## 2.5 最新一轮（5.16.29）新增的两块
+## 2.5 最近几轮（5.16.29 → 5.16.33）新增的东西
 
 ### 计划页当备忘录
 
@@ -112,6 +112,20 @@ ZHIZI_SYNC_HOST / ZHIZI_SYNC_PORT / ZHIZI_SYNC_APPKEY / ZHIZI_SYNC_CERT
 - 文档：`docs/MCP.md`
 
 测试：`test/mcp_server_test.dart`（真起 HTTP，10 条）、`test/mcp_sheet_test.dart`（面板渲染）、`test/memo_tasks_test.dart`（4 条）。
+
+### 5.16.30 ~ 5.16.33：Windows 窗口
+
+- **顶栏分带**：自绘标题栏在 Scaffold 之外，会漏出窗口黑底形成色带。
+  现在顶栏底色按「正文紧贴顶栏的颜色」反解（`matchTitleBar`，每 1.5 秒一次），
+  顶栏与正文的差从 136 降到 0~4
+- **DWM 窗框扩展**：`DwmExtendFrameIntoClientArea` 从**主线程直接调用不生效**，
+  必须在后台线程里调（`extendFrame`）；窗口移动/尺寸变化时也要补一次
+- **去掉 `WS_CAPTION`**：DWM 不再在顶部留自己的标题栏区域，材质才能铺满整窗
+- **毛玻璃默认最大档（通透）**：`lib/ui_prefs.dart` 的 `glassStrength` 默认 2，
+  旧默认 1 会被迁移到 2
+- **拖拽**：Flutter 视图是全覆盖子窗口，命中测试收不到，自绘边框的拖动由
+  Flutter 侧 `GestureDetector` 发起（`dragWindow` → `WM_NCLBUTTONDOWN + HTCAPTION`）
+- **启动清置顶**：`OnCreate` 里 `SetWindowPos(HWND_NOTOPMOST)`，外部工具留的置顶不会粘住
 
 ---
 
