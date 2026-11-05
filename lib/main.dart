@@ -219,9 +219,15 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
     _titleBarMatchTimer?.cancel();
     _titleBarMatchTimer = null;
     if (!glassOn) return;
-    WindowBridge.matchTitleBar();
+    final alpha = switch (context.read<UiPrefs>().glassStrength) {
+      0 => 0.9,
+      2 => 0.34,
+      _ => 0.62,
+    };
+    final surface = _argb(Theme.of(context).colorScheme.surface);
+    WindowBridge.matchTitleBar(alpha: alpha, surface: surface);
     _titleBarMatchTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
-      WindowBridge.matchTitleBar();
+      WindowBridge.matchTitleBar(alpha: alpha, surface: surface);
     });
   }
 

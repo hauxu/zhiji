@@ -277,11 +277,27 @@ void FlutterWindow::HandleWindowMethod(
       result->Success(flutter::EncodableValue(false));
       return;
     }
+    double alpha = 0.34;
+    int64_t surface = 0;
+    const auto* args = method_call.arguments();
+    if (args && std::holds_alternative<flutter::EncodableMap>(*args)) {
+      const auto& map = std::get<flutter::EncodableMap>(*args);
+      auto a_it = map.find(flutter::EncodableValue("alpha"));
+      if (a_it != map.end() && std::holds_alternative<double>(a_it->second)) {
+        alpha = std::get<double>(a_it->second);
+      }
+      auto s_it = map.find(flutter::EncodableValue("surface"));
+      if (s_it != map.end() && std::holds_alternative<int64_t>(s_it->second)) {
+        surface = std::get<int64_t>(s_it->second);
+      }
+    }
     RECT wr{};
     ::GetWindowRect(hwnd, &wr);
     int w = wr.right - wr.left;
-    int y = wr.top - 12;
-    if (y < 2) y = wr.top + 4;
+    // 采样正文紧贴顶栏的位置：那才是顶栏旁边真实的表现。
+    UINT dpi0 = ::GetDpiForWindow(hwnd);
+    if (dpi0 == 0) dpi0 = 96;
+    int y = wr.top + ::MulDiv(42, dpi0, 96);
     int rs[5] = {0}, gs[5] = {0}, bs[5] = {0};
     HDC dc = ::GetDC(nullptr);
     for (int i = 0; i < 5; i++) {
@@ -299,7 +315,17 @@ void FlutterWindow::HandleWindowMethod(
         if (bs[j] < bs[i]) std::swap(bs[i], bs[j]);
       }
     }
-    COLORREF target = RGB(rs[2], gs[2], bs[2]);
+    // 正文 = 雾面(α) 盖在背景上；反解出让顶栏与之一致的 caption 色。
+    int sr = (surface >> 16) & 0xFF;
+    int sg = (surface >> 8) & 0xFF;
+    int sb = surface & 0xFF;
+    double keep = 1.0 - alpha;
+    auto solve = [&](int rendered, int surf) -> int {
+      if (keep < 0.05) return surf;
+      int v = static_cast<int>((rendered - alpha * surf) / keep + 0.5);
+      return v < 0 ? 0 : (v > 255 ? 255 : v);
+    };
+    COLORREF target = RGB(solve(rs[2], sr), solve(gs[2], sg), solve(bs[2], sb));
     ::DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &target, sizeof(target));
     result->Success(flutter::EncodableValue(true));
     return;

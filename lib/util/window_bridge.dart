@@ -82,10 +82,16 @@ class WindowBridge {
   }
 
   /// 按窗口上方的屏幕颜色设置顶栏底色，让顶栏与材质融在一起。
-  static Future<void> matchTitleBar() async {
+  static Future<void> matchTitleBar({
+    required double alpha,
+    required int surface,
+  }) async {
     if (!Platform.isWindows) return;
     try {
-      await _channel.invokeMethod<bool>('matchTitleBar', true);
+      await _channel.invokeMethod<bool>('matchTitleBar', {
+        'alpha': alpha,
+        'surface': surface,
+      });
     } catch (_) {}
   }
 
