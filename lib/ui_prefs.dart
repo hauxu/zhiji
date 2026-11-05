@@ -72,7 +72,15 @@ class UiPrefs extends ChangeNotifier {
       cbookCollapsedCount = prefs.getInt(_kCBookCollapsed) ?? 10;
       bgPath = prefs.getString(_kBgPath) ?? '';
       bgOpacity = prefs.getDouble(_kBgOpacity) ?? 0.35;
-      glassStrength = (prefs.getInt(_kGlassStrength) ?? 1).clamp(0, 2);
+      // 默认「通透」（最大档）：毛玻璃感最强，顶栏与正文透出同一块材质。
+      // 旧版本默认是 1（标准），这里把未明确选择的 1 迁到 2。
+      final storedStrength = prefs.getInt(_kGlassStrength);
+      glassStrength = storedStrength == null
+          ? 2
+          : (storedStrength == 1 ? 2 : storedStrength.clamp(0, 2));
+      if (storedStrength != glassStrength) {
+        await prefs.setInt(_kGlassStrength, glassStrength);
+      }
       bgEnabled = prefs.getBool(_kBgEnabled) ?? false;
     } catch (_) {}
     notifyListeners();
