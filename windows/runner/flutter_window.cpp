@@ -6,8 +6,9 @@
 #include <objidl.h>
 #include <shobjidl_core.h>
 
-#include <algorithm>
 #include <optional>
+#include <thread>
+#include <cstdio>
 
 #include "flutter/generated_plugin_registrant.h"
 #include "flutter/method_channel.h"
@@ -270,33 +271,17 @@ void FlutterWindow::HandleWindowMethod(
   }
 
   if (method == "matchTitleBar") {
-    // 顶栏那条的分带来自 DWM 的 caption 底色与正文背景不一致。
-    // 采样正文靠近顶栏的几处已渲染颜色，反推出能让两者一致的 caption 色。
+    // 顶栏那条的底色按「窗口上方屏幕颜色」取：那正是顶栏背后该有的材质。
     HWND hwnd = GetHandle();
     if (hwnd == nullptr) {
       result->Success(flutter::EncodableValue(false));
       return;
     }
-    double alpha = 0.62;
-    int64_t surface = 0;
-    const auto* args = method_call.arguments();
-    if (args && std::holds_alternative<flutter::EncodableMap>(*args)) {
-      const auto& map = std::get<flutter::EncodableMap>(*args);
-      auto a_it = map.find(flutter::EncodableValue("alpha"));
-      if (a_it != map.end() && std::holds_alternative<double>(a_it->second)) {
-        alpha = std::get<double>(a_it->second);
-      }
-      auto s_it = map.find(flutter::EncodableValue("surface"));
-      if (s_it != map.end() && std::holds_alternative<int64_t>(s_it->second)) {
-        surface = std::get<int64_t>(s_it->second);
-      }
-    }
     RECT wr{};
     ::GetWindowRect(hwnd, &wr);
     int w = wr.right - wr.left;
-    UINT dpi = ::GetDpiForWindow(hwnd);
-    if (dpi == 0) dpi = 96;
-    int y = wr.top + ::MulDiv(42, dpi, 96);
+    int y = wr.top - 12;
+    if (y < 2) y = wr.top + 4;
     int rs[5] = {0}, gs[5] = {0}, bs[5] = {0};
     HDC dc = ::GetDC(nullptr);
     for (int i = 0; i < 5; i++) {
@@ -314,17 +299,40 @@ void FlutterWindow::HandleWindowMethod(
         if (bs[j] < bs[i]) std::swap(bs[i], bs[j]);
       }
     }
-    int sr = (surface >> 16) & 0xFF;
-    int sg = (surface >> 8) & 0xFF;
-    int sb = surface & 0xFF;
-    double keep = 1.0 - alpha;
-    auto solve = [&](int rendered, int surf) -> int {
-      if (keep < 0.05) return surf;
-      int v = static_cast<int>((rendered - alpha * surf) / keep + 0.5);
-      return v < 0 ? 0 : (v > 255 ? 255 : v);
-    };
-    COLORREF target = RGB(solve(rs[2], sr), solve(gs[2], sg), solve(bs[2], sb));
+    COLORREF target = RGB(rs[2], gs[2], bs[2]);
     ::DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, &target, sizeof(target));
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
+  if (method == "extendFrame") {
+    // 插件只扩展了左边（{-1,0,0,0}），顶栏那条因此没有材质。
+    // 四边全部扩展，DWM 材质才会铺满整窗，顶栏与正文看到同一块背景。
+    frame_extend_on_ = true;
+    HWND hwnd = GetHandle();
+    if (hwnd != nullptr) {
+      // 只设扩展，不动窗口位置/尺寸：SetWindowPos(FRAMECHANGED) 会让
+      // DWM 重新计算窗框，把刚设的扩展收回。
+      // 换后台线程调用：主线程直接调用不生效（外部进程调用却有效）。
+      MARGINS all{-1, -1, -1, -1};
+      std::thread([this, hwnd, all]() {
+        DwmExtendFrameIntoClientArea(hwnd, &all);
+        if (child_content() != nullptr) {
+          DwmExtendFrameIntoClientArea(child_content(), &all);
+        }
+      }).detach();
+    }
+    result->Success(flutter::EncodableValue(true));
+    return;
+  }
+
+  if (method == "clearFrameExtend") {
+    frame_extend_on_ = false;
+    HWND hwnd = GetHandle();
+    if (hwnd) {
+      MARGINS zero{0, 0, 0, 0};
+      DwmExtendFrameIntoClientArea(hwnd, &zero);
+    }
     result->Success(flutter::EncodableValue(true));
     return;
   }
@@ -436,6 +444,17 @@ LRESULT
 FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
+  // 窗口移动/尺寸变化后 DWM 会收回窗框扩展，这里立刻补回来。
+  if (message == WM_WINDOWPOSCHANGED && frame_extend_on_) {
+    MARGINS all{-1, -1, -1, -1};
+    std::thread([this, hwnd, all]() {
+      DwmExtendFrameIntoClientArea(hwnd, &all);
+      if (child_content() != nullptr) {
+        DwmExtendFrameIntoClientArea(child_content(), &all);
+      }
+    }).detach();
+  }
+
   // 自绘边框的消息要在转发给引擎之前处理，否则会被它先消费掉。
   switch (message) {
     // 客户区铺满整个窗口：系统标题栏和边框都不要，材质才能连成一片。

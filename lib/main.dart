@@ -212,19 +212,16 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
     if (mounted) setState(() {});
   }
 
-  Timer? _matchTimer;
+  Timer? _titleBarMatchTimer;
 
-  /// 顶栏底色按正文实际渲染颜色反推，每 1.5 秒纠正一次：
-  /// 窗口移动、桌面变化、主题切换后顶栏都能跟上。
-  void _scheduleTitleBarMatch(bool glassOn, UiPrefs ui) {
-    _matchTimer?.cancel();
-    _matchTimer = null;
+  /// 顶栏底色跟随窗口上方的屏幕颜色，避免顶栏成为一条不融合的色带。
+  void _scheduleTitleBarMatch(bool glassOn) {
+    _titleBarMatchTimer?.cancel();
+    _titleBarMatchTimer = null;
     if (!glassOn) return;
-    final alpha = switch (ui.glassStrength) {0 => 0.9, 2 => 0.34, _ => 0.62};
-    final surface = _argb(Theme.of(context).colorScheme.surface);
-    WindowBridge.matchTitleBar(alpha: alpha, surface: surface);
-    _matchTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
-      WindowBridge.matchTitleBar(alpha: alpha, surface: surface);
+    WindowBridge.matchTitleBar();
+    _titleBarMatchTimer = Timer.periodic(const Duration(milliseconds: 1500), (_) {
+      WindowBridge.matchTitleBar();
     });
   }
 
@@ -234,7 +231,6 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
     if (Platform.isWindows) {
       WindowsShell.instance.glassEnabled.removeListener(_onGlassChanged);
     }
-    _matchTimer?.cancel();
     super.dispose();
   }
 
@@ -315,8 +311,9 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
             ),
           )
         : effectiveTheme;
-    // 主题或毛玻璃开关变化后推送标题栏。开毛玻璃时 caption 交给
-    // matchTitleBar 按正文实际颜色反推，避免顶栏与正文分成两条。
+    // 主题或毛玻璃开关变化后推送标题栏。开毛玻璃时不推 caption 底色
+    // （COLOR_NONE），顶栏直接透出材质；关毛玻璃时推主题色避免黑带。
+    _scheduleTitleBarMatch(glassOn);
     final signature =
         '$effectiveDark|$glassOn|${_argb(effectiveTheme.colorScheme.surface)}'
         '|${_argb(effectiveTheme.colorScheme.onSurface)}';
@@ -332,7 +329,6 @@ class _DynamicColorWrapperState extends State<DynamicColorWrapper>
         );
       });
     }
-    _scheduleTitleBarMatch(glassOn, ui);
     return MaterialApp(
       title: '之计',
       debugShowCheckedModeBanner: false,

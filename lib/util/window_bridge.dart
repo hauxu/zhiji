@@ -68,17 +68,24 @@ class WindowBridge {
     } catch (_) {}
   }
 
-  /// 按正文实际渲染颜色反推标题栏底色，消除顶栏与正文的分带。
-  static Future<void> matchTitleBar({
-    required double alpha,
-    required int surface,
-  }) async {
+  /// 四边全扩展 DWM 窗框，材质才会铺满整窗（插件只扩左边）。
+  static Future<void> extendFrame() async {
     if (!Platform.isWindows) return;
     try {
-      await _channel.invokeMethod<bool>('matchTitleBar', {
-        'alpha': alpha,
-        'surface': surface,
-      });
+      final f = File('F:/workspace/zcode/goalday/.localtest/bridge.log');
+      f.writeAsStringSync('extendFrame;', mode: FileMode.append);
+      await _channel.invokeMethod<bool>('extendFrame', true);
+    } catch (e) {
+      final f = File('F:/workspace/zcode/goalday/.localtest/bridge.log');
+      f.writeAsStringSync('ERR;', mode: FileMode.append);
+    }
+  }
+
+  /// 按窗口上方的屏幕颜色设置顶栏底色，让顶栏与材质融在一起。
+  static Future<void> matchTitleBar() async {
+    if (!Platform.isWindows) return;
+    try {
+      await _channel.invokeMethod<bool>('matchTitleBar', true);
     } catch (_) {}
   }
 

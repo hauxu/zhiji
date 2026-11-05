@@ -34,6 +34,17 @@ class WindowsShell with TrayListener {
   bool _ready = false;
   bool _quitting = false;
 
+  /// 材质设好后，DWM 有时会把窗框扩展收回（顶栏就缺材质）。
+  /// 每秒补一次四边全扩展，保证顶栏与正文看到同一块背景。
+  Timer? _frameTimer;
+
+  void _keepFrameExtended() {
+    _frameTimer?.cancel();
+    _frameTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      WindowBridge.extendFrame();
+    });
+  }
+
   bool get _enabled => Platform.isWindows;
 
   Future<void> setup({
@@ -66,6 +77,12 @@ class WindowsShell with TrayListener {
     final on = enabled ?? (prefs.getBool(_prefGlass) ?? true);
     await prefs.setBool(_prefGlass, on);
     glassEnabled.value = on;
+    if (on) {
+      _keepFrameExtended();
+    } else {
+      _frameTimer?.cancel();
+      _frameTimer = null;
+    }
     try {
       await acrylic.Window.initialize();
     } catch (_) {}
@@ -81,22 +98,27 @@ class WindowsShell with TrayListener {
           effect: acrylic.WindowEffect.acrylic,
           color: light ? const Color(0x2EF4F1EA) : const Color(0x2E0E1014),
         );
+        // 插件只扩展左边，顶栏会缺材质；四边全扩让材质铺满整窗。
+        await WindowBridge.extendFrame();
         return;
       } catch (_) {}
       try {
         await acrylic.Window.setEffect(effect: acrylic.WindowEffect.mica);
+        await WindowBridge.extendFrame();
         return;
       } catch (_) {}
       try {
         await acrylic.Window.setEffect(
           effect: acrylic.WindowEffect.transparent,
         );
+        await WindowBridge.extendFrame();
         return;
       } catch (_) {}
       return;
     }
     try {
       await acrylic.Window.setEffect(effect: acrylic.WindowEffect.disabled);
+      await WindowBridge.extendFrame();
     } catch (_) {}
   }
 

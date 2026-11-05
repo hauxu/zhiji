@@ -36,6 +36,8 @@ class FlutterWindow : public Win32Window {
 
   // 关闭窗口时是隐藏到托盘还是直接退出（由 Dart 侧设置）。
   bool minimize_to_tray_ = false;
+  /// 毛玻璃开启时四边全扩展，保证材质铺满整窗（含顶栏）。
+  bool frame_extend_on_ = false;
   bool quit_requested_ = false;
 
   flutter::DartProject project_;
